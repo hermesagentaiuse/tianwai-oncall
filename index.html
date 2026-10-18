@@ -319,11 +319,17 @@ function renderNav(){
 }
 function setTab(t){ tab=t; render(); }
 function render(){
+  const y=window.scrollY;
   renderNav(); const m=$('#main');
   const f={roster:renderRoster,battle:renderBattle,work:renderWork,academy:renderAcademy,
            stall:renderStall,merc:renderMerc,market:renderMarket,forge:renderForge,tavern:renderTavern,bag:renderBag}[tab];
   m.innerHTML=f();
+  window.scrollTo(0,y);
 }
+function stateSig(){
+  return [S.gold,S.lv,tab,S.summoned,S.stallHero,S.heroes.map(h=>h.lvl+':'+Math.round(h.fatigue/5)+':'+(h.job||'')+':'+(h.star||0)).join(','),(S.quest&&JSON.stringify(S.quest))||'',(S.stallStock||[]).length].join('|');
+}
+let lastSig='';
 
 /* ---- 點將錄 ---- */
 function busy(h){ return !!h.job || S.stallHero===h.uid; }
@@ -471,7 +477,7 @@ function battleTick(){
   if(ai.thorns&&mdmg>0){ const t=Math.round(mdmg*ai.thorns); b.monHp-=t; b.log.push(`🛡️ 固守反傷 ${t}`); }
   if(b.hp<=0){b.over=true;b.win=false;clearInterval(b.timer);b.log.push(`☠️ ${d.name} 戰死沙場……`);render();return;}
   b.log=b.log.slice(-40);
-  const el=$('#battlelog'); if(el)$('#main').innerHTML=renderBattleActive();
+  const el=$('#battlelog'); if(el){const y=window.scrollY;$('#main').innerHTML=renderBattleActive();window.scrollTo(0,y);}
 }
 function flee(){
   const b=S.battle; if(!b)return; clearInterval(b.timer);
@@ -875,7 +881,7 @@ function importSave(){
 }
 
 /* ================= 啟動 ================= */
-load(); refreshQuest(); offlineProgress(); render();
+load(); refreshQuest(); offlineProgress(); lastSig=stateSig(); render();
 setInterval(()=>{
   const now=Date.now(); const dt=(now-(S.lastTick||now))/1000;
   for(const h of S.heroes){
@@ -883,7 +889,8 @@ setInterval(()=>{
   }
   stallCustomer();
   save();
-  if(!S.battle) render();
+  // 只在狀態實質變化時重繪（疲勞以 5% 為粒度），避免每 3 秒無腦刷新導致畫面跳動
+  if(!S.battle && stateSig()!==lastSig){ lastSig=stateSig(); render(); }
 },3000);
 </script>
 </body>
