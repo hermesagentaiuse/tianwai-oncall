@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>天外召喚錄 — 卡片英雄 RPG v0.4</title>
+<title>天外召喚錄 — 卡片英雄 RPG v0.5</title>
 <style>
 :root{
   --bg:#141a26; --panel:#1d2534; --panel2:#25304a; --line:#33405c;
@@ -121,6 +121,37 @@ const HERO_DEFS = [
   {id:'chengyuan',name:'程遠志', emoji:'🪓', type:'武者', rarity:'N',   base:{str:9,vit:8,agi:6,wis:4,luk:6},    ranged:false, lore:'黃巾副將，聊勝於無。'},
   {id:'xiahou',   name:'夏侯惇', emoji:'🛡️',type:'響馬', rarity:'N',   base:{str:9,vit:9,agi:8,wis:6,luk:8},    ranged:true,  lore:'拔矢啖睛的獨眼將軍。'},
 ];
+const QUOTES = {
+  guanyu:   {open:['刀在人在，刀亡人亡！','關某來也！'], win:['酒尚溫，敵已敗。','一刀解千愁。'], lose:['虎落平陽……','某……某不甘心！']},
+  lubu:     {open:['天下誰堪與我一戰！','赤兔嘶風，誰敢與爭！'], win:['三英又奈何？','天下無雙，名不虛傳！'], lose:['時不我與……','這不可能！']},
+  zhugeliang:{open:['亮，有破敵之策。','借東風一用。'], win:['运筹帷幄之中。','不出所料。'], lose:['謀事在人，成事在天……']},
+  zhaoyun:  {open:['常山趙子龍在此！','七進七出，去去就回！'], win:['一身是膽。','如入無人之境。'], lose:['竟失手於此……']},
+  huangzhong:{open:['看某百步穿楊！','老將出馬，一個頂倆！'], win:['箭無虛發！'], lose:['廉頗老矣……']},
+  pangtong: {open:['鳳雛親自動手了。','且看吾之奇謀！'], win:['計成矣。'], lose:['天不助我……']},
+  moli:     {open:['木蘭從軍，不讓鬚眉！','萬里赴戎機！'], win:['不聞爺娘喚木蘭，只聞燕山胡騎鳴啾啾。'], lose:['阿爺無大兒……']},
+  nezha:    {open:['小爺來也！','風火輪起，乾坤圈到！'], win:['小意思！','三頭六臂，爽！'], lose:['嗚……師父救我！']},
+  zhangfei: {open:['燕人張翼德在此！','哇呀呀呀——！'], win:['痛快！','再来三百回合！'], lose:['俺……俺酒後誤事……']},
+  diaochan: {open:['月下有佳人。','閉月之姿，請君一觀。'], win:['妾身幸不辱命。'], lose:['花謝花飛飛滿天……']},
+  liubei:   {open:['備，德薄才疏，盡力而為。','兄弟們，上！'], win:['此備之幸。'], lose:['備……哭予何益！']},
+  sunjian:  {open:['江東孫文台！','傳國玉玺在此！'], win:['江東基業，穩如泰山。'], lose:['箭傷復發……']},
+  zhangjiao:{open:['蒼天已死，黃天當立！','太平道法，起！'], win:['黃天庇佑！'], lose:['大賢良師……隕落……']},
+  huatuo:   {open:['医者，亦可执剑。','青囊在手，生死人肉白骨。'], win:['悬壶济世，顺便除魔。'], lose:['医者不能自医……']},
+  luban:    {open:['機巧之道，變幻莫測！','讓魯班看看你的構造！'], win:['這個設計還不錯。'], lose:['傑作……碎了……']},
+  dongzhuo: {open:['錢能推鬼，也能壓人！','知吾利害否！'], win:['錢就是膽量。'], lose:['吾之寶藏……！']},
+  chengyuan:{open:['副將程遠志參上！','黃巾萬歲！'], win:['歪打正著！'], lose:['被斬於馬下……']},
+  xiahou:   {open:['拔矢啖睛，何足掛齒！','獨眼照样射穿你！'], win:['一箭報恩。'], lose:['此目……又盲了……']},
+};
+const GEN_QUOTES = {
+  武者:{open:['來將慢走！','吃我一擊！'], win:['不過如此！'], lose:['可惡……!']},
+  響馬:{open:['一箭定江山！'], win:['弦無虛發。'], lose:['弓斷力竭……']},
+  策士:{open:['且入吾彀中。'], win:['勝券在握。'], lose:['計謀被破了……']},
+  仙士:{open:['道法自然。'], win:['符到病除。'], lose:['道行不足……']},
+  工匠:{open:['讓器械說話！'], win:['做工紮實，勝負已定。'], lose:['零件散架了……']},
+};
+function quoteFor(h,when){
+  const q=QUOTES[h.defId]; if(q&&q[when]&&q[when].length) return q[when][Math.floor(Math.random()*q[when].length)];
+  const g=GEN_QUOTES[heroDef(h).type]; return g&&g[when]?g[when][Math.floor(Math.random()*g[when].length)]:null;
+}
 const TYPE_GROWTH = {
   武者:{str:2,vit:2,agi:1,wis:0,luk:1}, 響馬:{agi:2,luk:2,str:1,vit:1,wis:0},
   策士:{wis:2,luk:2,str:0,vit:1,agi:1}, 仙士:{wis:2,agi:2,str:0,vit:1,luk:1},
@@ -144,13 +175,13 @@ const CARD_DEFS = {
   eq_bowstring:{id:'eq_bowstring',kind:'equip',name:'名弓弦卡',emoji:'🎯',desc:'敏捷+6（遠程最愛）',bonus:{agi:6}},
 };
 const MONSTERS = [
-  {id:'boar', name:'野豬',emoji:'🐗',lv:1,hp:55,atk:6,def:1,gold:14,exp:10,drops:{hide:1},drate:.7},
-  {id:'bandit',name:'山賊',emoji:'🪓',lv:2,hp:90,atk:10,def:3,gold:28,exp:18,drops:{cloth:1,wood:1},drate:.5},
-  {id:'wolf', name:'黑風狼',emoji:'🐺',lv:3,hp:140,atk:14,def:4,gold:45,exp:30,drops:{hide:2,herb:1},drate:.5},
-  {id:'golem',name:'岩磐鬼',emoji:'🗿',lv:5,hp:240,atk:19,def:9,gold:80,exp:50,drops:{ore:2,stone:1},drate:.6},
-  {id:'fox',  name:'妖狐',emoji:'🦊',lv:6,hp:200,atk:26,def:5,gold:105,exp:65,drops:{herb:2,sand:1},drate:.5},
-  {id:'oni',  name:'夜叉',emoji:'👹',lv:8,hp:380,atk:36,def:11,gold:180,exp:110,drops:{ore:2,hide:2,sand:2},drate:.6},
-  {id:'dragon',name:'蛟龍',emoji:'🐲',lv:10,hp:650,atk:52,def:16,gold:400,exp:220,drops:{sand:3,ore:3,stone:2},drate:.75},
+  {id:'boar', name:'野豬',emoji:'🐗',lv:1,hp:55,atk:6,def:1,gold:14,exp:10,drops:{hide:1},drate:.7,aiWeak:'guard',weakTxt:'野豬欺軟怕硬——護衛（被動反擊）時牠攻+20%'},
+  {id:'bandit',name:'山賊',emoji:'🪓',lv:2,hp:90,atk:10,def:3,gold:28,exp:18,drops:{cloth:1,wood:1},drate:.5,aiWeak:'hold',weakTxt:'山賊鋌而走險——固守模式時牠攻+25%'},
+  {id:'wolf', name:'黑風狼',emoji:'🐺',lv:3,hp:140,atk:14,def:4,gold:45,exp:30,drops:{hide:2,herb:1},drate:.5,aiWeak:'decoy',weakTxt:'狼群識破誘敵之計——誘敵模式受傷+30%'},
+  {id:'golem',name:'岩磐鬼',emoji:'🗿',lv:5,hp:240,atk:19,def:9,gold:80,exp:50,drops:{ore:2,stone:1},drate:.6,aiWeak:'sweep',weakTxt:'岩磐鬼皮厚——掃蕩猛攻時英雄反震受傷+25%'},
+  {id:'fox',  name:'妖狐',emoji:'🦊',lv:6,hp:200,atk:26,def:5,gold:105,exp:65,drops:{herb:2,sand:1},drate:.5,aiWeak:'sweep',weakTxt:'妖狐狡獪——你越猛攻（掃蕩）牠越滑溜，受傷+30%'},
+  {id:'oni',  name:'夜叉',emoji:'👹',lv:8,hp:380,atk:36,def:11,gold:180,exp:110,drops:{ore:2,hide:2,sand:2},drate:.6,aiWeak:'sweep',weakTxt:'夜叉嗜戰——掃蕩模式激怒牠，攻+25%'},
+  {id:'dragon',name:'蛟龍',emoji:'🐲',lv:10,hp:650,atk:52,def:16,gold:400,exp:220,drops:{sand:3,ore:3,stone:2},drate:.75,aiWeak:'hold',weakTxt:'蛟龍纏鬥——固守時被壓制受傷+20%；但狙擊專打逆鱗：攻+15%'},
 ];
 /* 天外八種 AI 模式（原版規則表） */
 const AI_MODES = {
@@ -236,10 +267,25 @@ function toast(msg,color){
   if(color){el.style.borderColor=color;el.style.color=color;}
   $('#toasts').appendChild(el); setTimeout(()=>el.remove(),2600);
 }
+const BONDS = [
+  {ids:['liubei','guanyu','zhangfei'], name:'桃園結義', bonus:{str:2,vit:2,agi:2,wis:2,luk:2}, desc:'劉關張同隊全屬+2'},
+  {ids:['zhugeliang','pangtong'], name:'臥龍鳳雛', bonus:{wis:3}, desc:'孔明龐統同隊智慧+3'},
+  {ids:['lubu','diaochan'], name:'鳳儀亭', bonus:{luk:-3}, desc:'呂布携貂蟬運氣-3（無福之相）'},
+  {ids:['huatuo','zhangjiao'], name:'醫道之爭', bonus:{luk:3}, desc:'華佗與張角同隊運氣+3'},
+];
+function activeBonds(h){
+  const out=[]; const owned=new Set(S.heroes.map(x=>x.defId));
+  for(const b of BONDS){
+    if(!b.ids.includes(h.defId))continue;
+    if(b.ids.every(id=>owned.has(id))) out.push(b);
+  }
+  return out;
+}
 function heroStats(h){
   const d=heroDef(h); const g=TYPE_GROWTH[d.type]||TYPE_GROWTH.武者;
-  const st={}; for(const k of ['str','vit','agi','wis','luk']) st[k]=(d.base?d.base[k]:8)+g[k]*(h.lvl-1)+(h.perm[k]||0);
+  const st={}; const pm=h.perm||{}; for(const k of ['str','vit','agi','wis','luk']) st[k]=(d.base?d.base[k]:8)+g[k]*(h.lvl-1)+(pm[k]||0);
   for(const slot of h.slots){ if(!slot)continue; const c=CARD_DEFS[slot]; if(c&&c.bonus)for(const k in c.bonus)st[k]+=c.bonus[k]; }
+  for(const b of activeBonds(h)){ for(const k in b.bonus) st[k]=(st[k]||0)+b.bonus[k]; }
   return st;
 }
 function heroPower(h){const s=heroStats(h);return Math.round(s.str*3+s.vit*3+s.agi*2+s.wis*2+s.luk*1);}
@@ -348,7 +394,8 @@ function renderRoster(){
       <span class="badge r-${d.rarity}">${d.rarity}</span>
       <span class="emoji">${heroFace(h)}</span>
       <div class="name">${d.name} <span class="small">Lv.${h.lvl}</span></div>
-      <div class="small" style="text-align:center;color:var(--dim)">${d.type}${d.ranged?'・遠程':''}　⚡${heroPower(h)}</div>
+      <div class="small" style="text-align:center;color:var(--dim)">${d.type}${d.ranged?'・遠程':''}　⚡${heroPower(h)}
+        ${activeBonds(h).length?`<br><span style="color:var(--gold)">💞${activeBonds(h).map(b=>b.name).join(' ')}</span>`:''}</div>
       <div class="stats">力${st.str} 體${st.vit} 敏${st.agi} 智${st.wis} 運${st.luk}<br>HP ${heroHp(h)}｜攻 ${heroAtk(h)}｜防 ${heroDef_(h)}</div>
       <div class="bar" title="經驗"><i style="width:${Math.min(100,h.exp/expNeed(h.lvl)*100)}%;background:var(--blue)"></i></div>
       <div class="bar"><i style="width:${h.fatigue}%;background:${red?'var(--red)':'var(--green)'}"></i></div>
@@ -410,6 +457,7 @@ function renderBattle(){
     return `<div class="card"><span class="badge">Lv.${mon.lv}</span><span class="emoji">${monFace(mon)}</span>
     <div class="name">${mon.name}${hint}</div>
     <div class="stats">HP ${mon.hp}｜攻 ${mon.atk}｜防 ${mon.def}<br>掉落：${Object.entries(mon.drops).map(([m,n])=>MATERIALS[m].e+'×'+n).join(' ')}<br>🪙${mon.gold}｜EXP ${mon.exp}</div>
+    ${mon.weakTxt?`<div class="small" style="color:var(--dim);text-align:center;padding:2px 4px">⚠ ${mon.weakTxt}${mon.aiWeak===S.aiMode?'<span style="color:var(--red)">（你現在的戰術正踩中破綻！）</span>':''}</div>`:''}
     <div style="text-align:center"><button class="act red" ${canFight?'':'disabled'} onclick="startBattle('${mon.id}')">出戰</button></div>
     </div>`;}).join('')}
   </div></div>`;
@@ -439,16 +487,19 @@ function startBattle(mid){
   const mon=MONSTERS.find(m=>m.id===mid);
   if(mon.lv>h.lvl+3){ toast('等級差距過大，英雄不敢應戰','var(--red)');return; }
   if(h.fatigue>=80){ toast('英雄疲勞紅燈，強行出戰會分心——先收回休養','var(--red)');return; }
+  const q1=quoteFor(h,'open');
   S.battle={heroUid:h.uid, monId:mid, hp:heroHp(h), hpMax:heroHp(h), monHp:mon.hp, monMax:mon.hp,
-            log:[`【${heroDef(h).name}】（${AI_MODES[S.aiMode].name}）向 ${mon.name} 發起挑戰！`], over:false, monDebuff:1, tauntRounds:0};
+            log:[`【${heroDef(h).name}】（${AI_MODES[S.aiMode].name}）向 ${mon.name} 發起挑戰！`, ...(q1?[`${heroDef(h).emoji}「${q1}」`]:[])], over:false, monDebuff:1, tauntRounds:0};
   render(); S.battle.timer=setInterval(battleTick,750); battleTick();
 }
 function battleTick(){
   const b=S.battle; if(!b||b.over)return;
   const h=S.heroes.find(x=>x.uid===b.heroUid), d=heroDef(h), mon=MONSTERS.find(m=>m.id===b.monId);
   const ai=AI_MODES[S.aiMode];
-  // 英雄行動
-  let atk=heroAtk(h)*ai.dmgM*(0.85+Math.random()*0.3);
+  const weakNow = mon.aiWeak===S.aiMode;
+  // 英雄行動（狙擊破蛟龍逆鱗）
+  let snipeBonus=(S.aiMode==='snipe'&&mon.id==='dragon')?1.15:1;
+  let atk=heroAtk(h)*ai.dmgM*snipeBonus*(0.85+Math.random()*0.3);
   let crit=Math.random()<heroCrit(h); if(crit)atk*=1.5;
   let skillTxt='';
   for(const slot of h.slots){
@@ -468,10 +519,20 @@ function battleTick(){
   b.log.push(`${d.emoji} ${d.name} ${crit?'會心一擊':''}造成 ${dmg} ${skillTxt}`);
   if(b.monHp<=0){b.over=true;b.win=true;clearInterval(b.timer);b.log.push(`🏆 ${mon.name} 倒下了！`);render();return;}
   // 怪物行動
-  let matk=mon.atk*ai.takeM*b.monDebuff*(0.85+Math.random()*0.3);
+  let weakAtkM=1, weakTakeM=1;
+  if(weakNow){
+    if(mon.id==='boar') weakAtkM=1.2;
+    if(mon.id==='bandit') weakAtkM=1.25;
+    if(mon.id==='wolf') weakTakeM=1.3;
+    if(mon.id==='golem') weakTakeM=1.25;
+    if(mon.id==='fox') weakTakeM=1.3;
+    if(mon.id==='oni') weakAtkM=1.25;
+    if(mon.id==='dragon') weakTakeM=1.2;
+  }
+  let matk=mon.atk*ai.takeM*b.monDebuff*weakAtkM*(0.85+Math.random()*0.3);
   if(b.tauntRounds>0){ matk*=1.15; b.tauntRounds--; } // 被挑釁：怒氣漲但只能打英雄
   b.monDebuff=1;
-  let mdmg=Math.max(1,Math.round(matk-heroDef_(h)));
+  let mdmg=Math.max(1,Math.round(matk*weakTakeM-heroDef_(h)));
   b.hp-=mdmg; floatDmg('sideHero','-'+mdmg,'var(--red)');
   b.log.push(`${mon.emoji} ${mon.name} 反擊 ${mdmg}`);
   if(ai.thorns&&mdmg>0){ const t=Math.round(mdmg*ai.thorns); b.monHp-=t; b.log.push(`🛡️ 固守反傷 ${t}`); }
@@ -500,7 +561,8 @@ function endBattle(){
     for(const [m,n] of Object.entries(mon.drops)){
       if(Math.random()<Math.min(.98,mon.drate*(ai.dropM||1))){ S.inv.mats[m]=(S.inv.mats[m]||0)+n; drops.push(MATERIALS[m].e+'×'+n); }
     }
-    b.log.unshift(`🏆 擊殺 ${mon.name}！🪙${g}、EXP ${mon.exp}${drops.length?'，掉落 '+drops.join(' '):''}`);
+    const qw=quoteFor(h,'win');
+    b.log.unshift(`🏆 擊殺 ${mon.name}！🪙${g}、EXP ${mon.exp}${drops.length?'，掉落 '+drops.join(' '):''}${qw?`　${d.emoji}「${qw}」`:''}`);
     while(h.exp>=expNeed(h.lvl)){h.exp-=expNeed(h.lvl);h.lvl++;b.log.push(`⬆️ ${d.name} 升至 Lv.${h.lvl}！`);}
     S.exp+=Math.round(mon.exp/3);
     while(S.exp>=expNeed(S.lv)){S.exp-=expNeed(S.lv);S.lv++;b.log.push(`🌟 主君升至 Lv.${S.lv}！`);}
@@ -508,7 +570,8 @@ function endBattle(){
     const keys=['str','vit','agi','wis','luk'].filter(k=>(h.perm[k]||0)>-3);
     const k=keys[Math.floor(Math.random()*keys.length)];
     h.perm[k]=(h.perm[k]||0)-1;
-    b.log=[`☠️ ${d.name} 戰死。復活後「${STAT_CN[k]}」永久 -1……好好照料你的英雄。`];
+    const ql=quoteFor(h,'lose');
+    b.log=[`☠️ ${d.name} 戰死。復活後「${STAT_CN[k]}」永久 -1……好好照料你的英雄。${ql?`　最後一句：「${ql}」`:''}`];
   }
   if(isMerc){ // 傭兵用完即散
     S.heroes=S.heroes.filter(x=>x.uid!==h.uid); S.summoned=null;
@@ -613,8 +676,17 @@ function closeStall(){
 function stallList(mat){
   const have=S.inv.mats[mat]||0; if(have<=0)return;
   const n=Math.min(have,10); S.inv.mats[mat]-=n;
-  const ex=S.stallStock.find(x=>x.mat===mat&&!x.cardId);
-  if(ex)ex.count+=n; else S.stallStock.push({mat,count:n,price:stallPrice(mat)});
+  // 反洗錢：NPC 高價買入的材料再擺攤只值半價（顧客只要「手作」）
+  const bought=(S.boughtMats&&S.boughtMats[mat])||0;
+  const handmade=Math.max(0,have-bought);
+  const nHand=Math.min(n,handmade), nBought=n-nHand;
+  if(nBought>0&&S.boughtMats)S.boughtMats[mat]=Math.max(0,bought-nBought);
+  const pHalf=Math.round(stallPrice(mat)*0.5);
+  if(nHand>0){ const ex=S.stallStock.find(x=>x.mat===mat&&!x.cardId&&x.price===stallPrice(mat));
+    if(ex)ex.count+=nHand; else S.stallStock.push({mat,count:nHand,price:stallPrice(mat)}); }
+  if(nBought>0){ const ex2=S.stallStock.find(x=>x.mat===mat&&!x.cardId&&x.price===pHalf);
+    if(ex2)ex2.count+=nBought; else S.stallStock.push({mat,count:nBought,price:pHalf}); }
+  if(nBought>0) toast(`${nBought} 個「非手作」材料只賣半價 🪙${pHalf}（顧客精明了）`,'var(--dim)');
   save(); render();
 }
 function stallListCard(cid){
@@ -725,7 +797,7 @@ function npcSell(mat,n){
 }
 function npcBuy(mat,n){
   const cost=Math.round(MATERIALS[mat].price*1.5)*n; if(S.gold<cost)return;
-  S.gold-=cost; S.inv.mats[mat]=(S.inv.mats[mat]||0)+n; toast(`買入 ${n} ${MATERIALS[mat].n}，-🪙${cost}`,'var(--red)'); save(); render();
+  S.gold-=cost; S.inv.mats[mat]=(S.inv.mats[mat]||0)+n; S.boughtMats=S.boughtMats||{}; S.boughtMats[mat]=(S.boughtMats[mat]||0)+n; toast(`買入 ${n} ${MATERIALS[mat].n}，-🪙${cost}`,'var(--red)'); save(); render();
 }
 function buyOffer(i){
   const o=S.marketOffers[i]; if(!o||o.sold||S.gold<o.price)return;
