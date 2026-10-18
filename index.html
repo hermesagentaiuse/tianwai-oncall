@@ -205,11 +205,22 @@ function defaultState(){
     marketDay:0, marketOffers:[], marketRefreshedAt:0, // 行腳商人
     mercPool:[], mercDay:-1,                  // 每日傭兵池
     lastTick:Date.now(), pulls:0, stallLog:[],
+    questDay:-1, quest:{win:0,job:0,pull:0}, questClaimed:[],
   };
 }
-function save(){ S.lastTick=Date.now(); localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }
+function questTick(type){ S.quest[type]=(S.quest[type]||0)+1; }
+function questDone(){ const q=S.quest; return q.win>=5&&q.job>=1&&q.pull>=1; }
+function refreshQuest(){ if(S.questDay!==today()){ S.questDay=today(); S.quest={win:0,job:0,pull:0}; S.questClaimed=[]; } }
+function claimQuest(){
+  refreshQuest();
+  if(!questDone()){toast('任務尚未完成','var(--red)');return;}
+  if((S.questClaimed||[]).length>=1){toast('今日獎勵已領','var(--dim)');return;}
+  S.gold+=300; S.questClaimed.push('daily');
+  toast('📜 每日任務完成！+🪙300','var(--gold)'); save(); render();
+}
+function save(){ S.lastTick=Date.now(); localStorage.setItem(SAVE_KEY, JSON.stringify(S,(k,v)=>k==='timer'?undefined:v)); }
 function load(){
-  try{ const d=localStorage.getItem(SAVE_KEY); if(d){ S=JSON.parse(d); return; } }catch(e){}
+  try{ const d=localStorage.getItem(SAVE_KEY); if(d){ S=JSON.parse(d); S.heroes=(S.heroes||[]).filter(h=>!h.merc); if(S.summoned&&!S.heroes.some(h=>h.uid===S.summoned))S.summoned=null; S.battle=null; return; } }catch(e){}
   S=defaultState();
   S.heroes.push(makeHero('guanyu'), makeHero('zhangfei'));
   S.inv.cards.eq_sword=1; S.inv.cards.sk_fire=1;
@@ -266,10 +277,12 @@ function offlineProgress(){
     if(h.job){
       const j=JOBS.find(x=>x.id===h.job); const st=heroStats(h);
       const eff=(st[JOB_BASE[j.id]]||8)/16 * j.rate;
-      const gain=Math.floor(elapsed/20*eff*(1+h.lvl*.08));
+      const paidSec=Math.min((now-(h.jobStart||now))/1000, 8*3600);
+      const gain=Math.floor(Math.max(0,paidSec)/20*eff*(1+h.lvl*.08));
       if(gain>0){ S.inv.mats[j.mat]=(S.inv.mats[j.mat]||0)+gain;
         notes.push(`${heroDef(h).name} 打工帶回 ${j.matName}×${gain}`); }
       h.fatigue=Math.min(100,h.fatigue+elapsed*0.002);
+      h.jobStart=now;
     } else if(S.summoned!==h.uid && S.stallHero!==h.uid){
       h.fatigue=Math.max(0,h.fatigue-elapsed*0.015);
     }
@@ -279,6 +292,7 @@ function offlineProgress(){
     const h=S.heroes.find(x=>x.uid===S.stallHero);
     if(h){
       const st=heroStats(h);
+      h.fatigue=Math.min(100,h.fatigue+elapsed*0.0008);
       let customers=Math.floor(elapsed/90*(0.8+st.luk/30));
       let revenue=0, sold=[];
       while(customers-->0 && S.stallStock.length){
@@ -336,7 +350,9 @@ function renderRoster(){
         ${Object.values(h.perm).some(v=>v<0)?'<span style="color:var(--red)">（戰死損傷↓）</span>':''}</div>
       <div class="slots">${slots.join('')}</div>
       <div style="text-align:center">${summoned?`<button class="act red" onclick="unsummon()">收回點將錄</button>`
-        :`<button class="act gold" ${canSummon?'':'disabled'} onclick="summon('${h.uid}')">召喚</button>`}</div>
+        :`<button class="act gold" ${canSummon?'':'disabled'} onclick="summon('${h.uid}')">召喚</button>`}
+        ${(S.heroes.filter(x=>x.defId===h.defId).length>1&&(h.star||0)<3)?`<button class="act" onclick="fuseHero('${h.uid}')">⭐合成（全屬+2）</button>`:''}
+        ${(h.star||0)>0?`<span style="color:var(--gold)">${'★'.repeat(h.star)}</span>`:''}</div>
     </div>`;}).join('')}</div></div>`;
 }
 function summon(uid){
@@ -344,8 +360,21 @@ function summon(uid){
   S.summoned=uid; summonFx(); toast(`${heroDef(h).emoji} ${heroDef(h).name} 現出實體！`); save(); render();
 }
 function unsummon(){ S.summoned=null; save(); render(); toast('英雄化卡歸隊，開始恢復疲勞。'); }
+function fuseHero(uid){
+  const h=S.heroes.find(x=>x.uid===uid); if(!h)return;
+  if((h.star||0)>=3){toast('已達 ★3 極限','var(--red)');return;}
+  if(S.summoned===uid){toast('召喚中不能合成，先收回','var(--red)');return;}
+  if(busy(h)){toast('打工/看攤中不能合成','var(--red)');return;}
+  const dup=S.heroes.find(x=>x.defId===h.defId&&x.uid!==uid); if(!dup)return;
+  if(!confirm(`犧牲另一位【${heroDef(h).name}】與他合成？全屬性永久 +2（${h.star||0}/3 → ${(h.star||0)+1}/3）`))return;
+  S.heroes=S.heroes.filter(x=>x.uid!==dup.uid);
+  h.star=(h.star||0)+1;
+  for(const k of ['str','vit','agi','wis','luk'])h.perm[k]=(h.perm[k]||0)+2;
+  toast(`⭐ ${heroDef(h).name} 合體成功！全屬性+2（★${h.star}）`,'var(--gold)'); save(); render();
+}
 function unequip(uid,i){
   const h=S.heroes.find(x=>x.uid===uid); if(!h||!h.slots[i])return;
+  if(S.battle&&S.battle.heroUid===uid){ toast('戰鬥中不能卸卡！','var(--red)'); return; }
   const c=h.slots[i]; h.slots[i]=null; S.inv.cards[c]=(S.inv.cards[c]||0)+1;
   toast(`卸下 ${CARD_DEFS[c].name}`); save(); render();
 }
@@ -370,7 +399,7 @@ function renderBattle(){
   </div>
   <div class="panel"><h2>⚔️ 選擇歷練對象</h2><div class="grid">
   ${MONSTERS.map(mon=>{
-    const canFight=sm&&!busy(sm)&&mon.lv<=(sm.lvl+3);
+    const canFight=sm&&!busy(sm)&&mon.lv<=(sm.lvl+3)&&sm.fatigue<80;
     const hint=mon.lv>(sm?sm.lvl+3:3)?'（太強）':'';
     return `<div class="card"><span class="badge">Lv.${mon.lv}</span><span class="emoji">${monFace(mon)}</span>
     <div class="name">${mon.name}${hint}</div>
@@ -403,6 +432,7 @@ function startBattle(mid){
   const h=myHeroForBattle(); if(!h) return;
   const mon=MONSTERS.find(m=>m.id===mid);
   if(mon.lv>h.lvl+3){ toast('等級差距過大，英雄不敢應戰','var(--red)');return; }
+  if(h.fatigue>=80){ toast('英雄疲勞紅燈，強行出戰會分心——先收回休養','var(--red)');return; }
   S.battle={heroUid:h.uid, monId:mid, hp:heroHp(h), hpMax:heroHp(h), monHp:mon.hp, monMax:mon.hp,
             log:[`【${heroDef(h).name}】（${AI_MODES[S.aiMode].name}）向 ${mon.name} 發起挑戰！`], over:false, monDebuff:1, tauntRounds:0};
   render(); S.battle.timer=setInterval(battleTick,750); battleTick();
@@ -446,7 +476,9 @@ function battleTick(){
 function flee(){
   const b=S.battle; if(!b)return; clearInterval(b.timer);
   const h=S.heroes.find(x=>x.uid===b.heroUid);
-  h.fatigue=Math.min(100,h.fatigue+8); S.battle=null; save(); render(); toast('逃離戰場，疲勞 +8','var(--dim)');
+  if(h&&h.merc){ S.heroes=S.heroes.filter(x=>x.uid!==h.uid); S.summoned=null; toast('傭兵搖搖頭走了（雇傭費不歸還）','var(--red)'); }
+  else { if(h)h.fatigue=Math.min(100,h.fatigue+8); toast('逃離戰場，疲勞 +8','var(--dim)'); }
+  S.battle=null; save(); render();
 }
 function endBattle(){
   const b=S.battle; if(!b)return; clearInterval(b.timer);
@@ -457,7 +489,7 @@ function endBattle(){
     const ai=AI_MODES[S.aiMode];
     let g=Math.round(mon.gold*(0.9+Math.random()*0.2));
     if(isMerc){ g=Math.round(g*0.7); b.log.push(`（傭兵抽成新，報酬 ×0.7）`); }
-    S.gold+=g; h.exp+=mon.exp;
+    S.gold+=g; h.exp+=mon.exp; if(!isMerc)questTick('win');
     const drops=[];
     for(const [m,n] of Object.entries(mon.drops)){
       if(Math.random()<Math.min(.98,mon.drate*(ai.dropM||1))){ S.inv.mats[m]=(S.inv.mats[m]||0)+n; drops.push(MATERIALS[m].e+'×'+n); }
@@ -498,7 +530,8 @@ function renderWork(){
 }
 function startJob(uid){
   const h=S.heroes.find(x=>x.uid===uid); if(!h||h.job)return;
-  const sel=document.getElementById('jobsel_'+uid); h.job=sel.value; h.jobStart=Date.now();
+  if(h.fatigue>=80){ toast('疲勞紅燈，派不動','var(--red)'); return; }
+  const sel=document.getElementById('jobsel_'+uid); h.job=sel.value; h.jobStart=Date.now(); questTick('job');
   toast(`${heroDef(h).name} 出門${JOBS.find(j=>j.id===h.job).name}去了`); save(); render();
 }
 function stopJob(uid){
@@ -561,6 +594,7 @@ function stallPrice(mat){ return Math.round(MATERIALS[mat].price*1.35); }
 function cardMarketPrice(cid){ const r=RECIPES.find(x=>x.out===cid); return r?Math.round(r.gold*1.3+20):50; }
 function openStall(uid){
   const h=S.heroes.find(x=>x.uid===uid); if(!h||h.job||h.fatigue>=80)return;
+  if(S.summoned===uid){ toast('召喚中的英雄不能同時看攤，先收回點將錄','var(--red)'); return; }
   S.stallHero=uid; toast(`${heroDef(h).name} 支起攤子開張了 🏪`); save(); render();
 }
 function closeStall(){
@@ -663,7 +697,7 @@ function renderMarket(){
     <div class="small" style="text-align:center">持有 ${have}｜回收 🪙${Math.round(v.price*0.8)}/個｜出售 🪙${Math.round(v.price*1.5)}/個</div>
     <div style="text-align:center"><button class="act" ${have>=1?'':'disabled'} onclick="npcSell('${k}',10)">賣10</button>
     <button class="act" ${have>=1?'':'disabled'} onclick="npcSell('${k}',have)">全賣</button>
-    <button class="act green" ${S.gold>=Math.ceil(v.price*1.5)?'':'disabled'} onclick="npcBuy('${k}',10)">買10</button></div>
+    <button class="act green" ${S.gold>=Math.ceil(v.price*1.5*10)?'':'disabled'} onclick="npcBuy('${k}',10)">買10</button></div>
     </div>`;}).join('')}</div></div>
   <div class="panel"><h2>🐪 行腳商人（每日三件撿漏價）</h2>
   <p class="hint">過路商人甩賣卡片，6~11 折隨機，每日更換（一分鐘內可花 🪙20 重刷貨架）。</p>
@@ -717,10 +751,17 @@ function craft(outId){
 /* ---- 抽卡 ---- */
 function renderTavern(){
   return `<div class="panel"><h2>🎴 客棧・英雄卡出售</h2>
-  <p class="hint">SSR 5%／SR 20%／R 35%／N 40%（已抽 ${S.pulls} 次）。十連保底 SR+。</p>
+  <p class="hint">SSR 5%／SR 20%／R 35%／N 40%（已抽 ${S.pulls} 次）。十連保底 SR+，<b>連續 ${30-(S.pity||0)} 抽內必出 SSR</b>（客棧保底 ${S.pity||0}/30）。</p>
   <div class="row">
     <button class="act gold" ${S.gold>=PULL_COST?'':'disabled'} onclick="pull(1)">單抽 🪙${PULL_COST}</button>
-    <button class="act gold" ${S.gold>=PULL_COST*9?'':'disabled'} onclick="pull(9)">十連 🪙${PULL_COST*9}</button>
+    <button class="act gold" ${S.gold>=PULL_COST*9?'':'disabled'} onclick="pull(10)">十連 🪙${PULL_COST*9}（打折＋保底）</button>
+  </div></div>
+  <div class="panel"><h2>📜 每日任務（${S.questDay===today()?'今日':'未開始'}）</h2>
+  <div class="row">
+    <span class="tag">✅擊殺5隻：${Math.min(5,(S.quest&&S.quest.win)||0)}/5</span>
+    <span class="tag">✅派工1次：${Math.min(1,(S.quest&&S.quest.job)||0)}/1</span>
+    <span class="tag">✅抽卡1次：${Math.min(1,(S.quest&&S.quest.pull)||0)}/1</span>
+    <button class="act gold" ${questDone()&&(S.questClaimed||[]).length===0?'':'disabled'} onclick="claimQuest()">領取 🪙300</button>
   </div></div>
   <div class="panel"><h2>🖼️ 圖鑑（${new Set(S.heroes.map(h=>h.defId)).size}/${HERO_DEFS.length}）</h2>
   <div class="grid">${HERO_DEFS.map(d=>{
@@ -730,17 +771,22 @@ function renderTavern(){
     <div class="stats">${d.lore}<br>${d.type}｜持有 ×${owned}</div></div>`;}).join('')}</div></div>`;
 }
 function pull(n){
-  const cost=PULL_COST*n; if(S.gold<cost)return; S.gold-=cost;
+  const cost=(n===10?Math.round(PULL_COST*9):PULL_COST*n); if(S.gold<cost)return; S.gold-=cost;
+  S.pity=(S.pity||0);
   const got=[]; let hasRare=false;
   for(let i=0;i<n;i++){
     const avail={}; for(const k of ['SSR','SR','R','N']){ if(HERO_DEFS.some(d=>d.rarity===k))avail[k]={SSR:.05,SR:.2,R:.35,N:.4}[k]; }
     let rar=weightedPick(avail);
-    if(i===n-1&&n===9&&!hasRare)rar=Math.random()<.5?'SR':'R';
+    if(i===n-1&&n===10&&!hasRare)rar='SR';
+    S.pity++;
+    if(S.pity>=30){rar='SSR';S.pity=0;}
+    if(rar==='SSR')S.pity=0;
     if(rar==='SR'||rar==='SSR')hasRare=true;
     const pool=HERO_DEFS.filter(d=>d.rarity===rar);
     const d=pool[Math.floor(Math.random()*pool.length)];
     S.heroes.push(makeHero(d.id)); got.push(d); S.pulls++;
   }
+  questTick('pull');
   save(); showPullModal(got); render();
 }
 function showPullModal(got){
@@ -823,13 +869,13 @@ function importSave(){
     // 防呆：補齊舊版可能缺的欄位
     S.stallStock=S.stallStock||[]; S.stallLog=S.stallLog||[]; S.marketOffers=S.marketOffers||[];
     S.mercPool=S.mercPool||[]; S.marketDay=-1; S.mercDay=-1; S.battle=null; S.lastTick=Date.now();
-    for(const h of S.heroes){ h.perm=h.perm||{str:0,vit:0,agi:0,wis:0,luk:0}; h.slots=h.slots||[null,null,null,null,null]; h.fatigue=h.fatigue||0; }
+    for(const h of S.heroes){ h.perm=h.perm||{str:0,vit:0,agi:0,wis:0,luk:0}; h.slots=h.slots||[null,null,null,null,null]; h.fatigue=h.fatigue||0; if(h.job&&!h.jobStart)h.jobStart=Date.now(); }
     save(); toast('✅ 存檔導入成功，進度已恢復！','var(--green)'); render();
   }catch(e){ toast('導入失敗：存檔碼損毀或無效','var(--red)'); }
 }
 
 /* ================= 啟動 ================= */
-load(); offlineProgress(); render();
+load(); refreshQuest(); offlineProgress(); render();
 setInterval(()=>{
   const now=Date.now(); const dt=(now-(S.lastTick||now))/1000;
   for(const h of S.heroes){
