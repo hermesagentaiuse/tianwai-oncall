@@ -762,6 +762,14 @@ function renderBag(){
     <div style="text-align:center"><button class="act" ${sm?'':'disabled'} onclick="equipToSummoned('${cid}')">裝備</button></div></div>`;}).join('')}</div>`}
   </div>
   <div class="panel"><h2>📦 倉庫</h2><div class="mats">${Object.entries(MATERIALS).map(([k,v])=>`<span>${v.e} ${v.n} × ${S.inv.mats[k]||0}</span>`).join('')}</div></div>
+  <div class="panel"><h2>💾 存檔碼（跨裝置轉移）</h2>
+  <p class="hint">「導出」把你的全部進度（英雄/等級/金幣/倉庫/圖鑑）轉成一串文字，複製到其他裝置（或清紀錄前備份）貼進「導入」即可還原。<b>注意：存檔碼是編碼不是加密</b>，懂技術的人可解開甚至竄改——自用備份用途即可。</p>
+  <div class="row">
+    <button class="act gold" onclick="exportSave()">📤 導出存檔碼</button>
+    <button class="act" onclick="importSaveUI()">📥 導入存檔碼</button>
+  </div>
+  <div id="savecode" style="margin-top:8px"></div>
+  </div>
   <div class="panel" style="text-align:right"><button class="act red" onclick="wipe()">🗑 重置存檔</button>
   <span class="hint" style="margin-left:10px">v0.2｜存檔於 localStorage</span></div>`;
 }
@@ -774,6 +782,46 @@ function equipToSummoned(cid){
   toast(`${heroDef(h).name} 裝備 ${CARD_DEFS[cid].emoji} ${CARD_DEFS[cid].name}`,'var(--green)'); save(); render();
 }
 function wipe(){ if(confirm('確定重置所有進度？')){ localStorage.removeItem(SAVE_KEY); location.reload(); } }
+
+/* ---- 存檔碼導出/導入 ---- */
+function b64enc(str){ return btoa(unescape(encodeURIComponent(str))); }
+function b64dec(b64){ return decodeURIComponent(escape(atob(b64))); }
+function exportSave(){
+  try{
+    const payload = {v:2, t:Date.now(), state:S};
+    const code = 'TWO1:' + b64enc(JSON.stringify(payload));
+    const box = document.getElementById('savecode');
+    box.innerHTML = `<textarea readonly style="width:100%;height:110px;background:#0e1420;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px;font-size:11px;word-break:break-all">${code}</textarea>
+    <div class="row"><button class="act green" onclick="copyCode(this)">📋 複製全部</button>
+    <button class="act" onclick="document.getElementById('savecode').innerHTML=''">收起</button></div>`;
+    navigator.clipboard && navigator.clipboard.writeText(code).then(()=>toast('存檔碼已複製到剪貼簿','var(--green)')).catch(()=>{});
+  }catch(e){ toast('導出失敗：'+e.message,'var(--red)'); }
+}
+function copyCode(btn){
+  const ta=document.querySelector('#savecode textarea'); if(!ta)return;
+  ta.select(); try{document.execCommand('copy'); toast('已複製！','var(--green)');}catch(e){ toast('請手動全選複製','var(--dim)'); }
+}
+function importSaveUI(){
+  const box = document.getElementById('savecode');
+  box.innerHTML = `<textarea id="importcode" placeholder="貼上存檔碼（TWO1: 開頭）" style="width:100%;height:110px;background:#0e1420;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px;font-size:12px"></textarea>
+  <div class="row"><button class="act red" onclick="importSave()">📥 覆蓋導入</button>
+  <button class="act" onclick="document.getElementById('savecode').innerHTML=''">取消</button></div>`;
+}
+function importSave(){
+  const raw=(document.getElementById('importcode').value||'').trim();
+  if(!raw.startsWith('TWO1:')){ toast('存檔碼格式錯誤（應以 TWO1: 開頭）','var(--red)'); return; }
+  try{
+    const payload = JSON.parse(b64dec(raw.slice(5)));
+    if(!payload.state || !Array.isArray(payload.state.heroes)) throw new Error('結構不完整');
+    if(!confirm(`確定覆蓋現有進度？\n存檔內容：英雄 ${payload.state.heroes.length} 位、🪙${payload.state.gold}、主君 Lv.${payload.state.lv}\n（存檔時間：${new Date(payload.t).toLocaleString('zh-TW')}）`)) return;
+    S = payload.state;
+    // 防呆：補齊舊版可能缺的欄位
+    S.stallStock=S.stallStock||[]; S.stallLog=S.stallLog||[]; S.marketOffers=S.marketOffers||[];
+    S.mercPool=S.mercPool||[]; S.marketDay=-1; S.mercDay=-1; S.battle=null; S.lastTick=Date.now();
+    for(const h of S.heroes){ h.perm=h.perm||{str:0,vit:0,agi:0,wis:0,luk:0}; h.slots=h.slots||[null,null,null,null,null]; h.fatigue=h.fatigue||0; }
+    save(); toast('✅ 存檔導入成功，進度已恢復！','var(--green)'); render();
+  }catch(e){ toast('導入失敗：存檔碼損毀或無效','var(--red)'); }
+}
 
 /* ================= 啟動 ================= */
 load(); offlineProgress(); render();
