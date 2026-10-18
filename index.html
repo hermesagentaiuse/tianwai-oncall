@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>天外召喚錄 — 卡片英雄 RPG v0.5</title>
+<title>天外召喚錄 — 卡片英雄 RPG v0.6</title>
 <style>
 :root{
   --bg:#141a26; --panel:#1d2534; --panel2:#25304a; --line:#33405c;
@@ -85,7 +85,7 @@ h3.sub{font-size:13px;color:var(--dim);margin:10px 0 4px}
 <body>
 <div id="app">
 <header>
-  <h1>🎴 天外召喚錄 <span style="font-size:11px;color:var(--dim)">v0.2</span></h1>
+  <h1>🎴 天外召喚錄 <span style="font-size:11px;color:var(--dim)">v0.6</span></h1>
   <div class="res">
     <span>🪙 <b id="rGold">0</b></span>
     <span>主君 Lv.<b id="rLv">1</b></span>
@@ -354,7 +354,7 @@ function offlineProgress(){
 
 /* ================= 導覽 ================= */
 let tab='roster';
-const TABS=[['roster','📖 點將錄'],['battle','⚔️ 歷練'],['work','🧺 打工'],['academy','🏫 學院'],['stall','🏪 擺攤'],['merc','🗡️ 傭兵'],['market','🛒 市場'],['forge','🔨 鍛造'],['tavern','🎴 客棧'],['bag','🎒 背包']];
+const TABS=[['roster','📖 點將錄'],['battle','⚔️ 歷練'],['work','🧺 打工'],['academy','🏫 學院'],['stall','🏪 擺攤'],['merc','🗡️ 傭兵'],['market','🛒 市場'],['forge','🔨 鍛造'],['tavern','🎴 客棧'],['bag','🎒 背包'],['save','💾 存檔']];
 function renderNav(){
   $('#nav').innerHTML=TABS.map(([id,n])=>`<button class="${tab===id?'on':''}" onclick="setTab('${id}')">${n}</button>`).join('');
   $('#rGold').textContent=S.gold; $('#rLv').textContent=S.lv;
@@ -368,7 +368,7 @@ function render(){
   const y=window.scrollY;
   renderNav(); const m=$('#main');
   const f={roster:renderRoster,battle:renderBattle,work:renderWork,academy:renderAcademy,
-           stall:renderStall,merc:renderMerc,market:renderMarket,forge:renderForge,tavern:renderTavern,bag:renderBag}[tab];
+           stall:renderStall,merc:renderMerc,market:renderMarket,forge:renderForge,tavern:renderTavern,bag:renderBag,save:renderSave}[tab];
   m.innerHTML=f();
   window.scrollTo(0,y);
 }
@@ -418,7 +418,9 @@ function fuseHero(uid){
   if((h.star||0)>=3){toast('已達 ★3 極限','var(--red)');return;}
   if(S.summoned===uid){toast('召喚中不能合成，先收回','var(--red)');return;}
   if(busy(h)){toast('打工/看攤中不能合成','var(--red)');return;}
-  const dup=S.heroes.find(x=>x.defId===h.defId&&x.uid!==uid); if(!dup)return;
+  const cand=S.heroes.filter(x=>x.defId===h.defId&&x.uid!==uid&&!busy(x)&&S.summoned!==x.uid&&!(S.battle&&S.battle.heroUid===x.uid));
+  if(!cand.length){toast('沒有可當祭品的同名英雄（在場/打工/看攤/戰鬥中的不可獻祭）','var(--red)');return;}
+  const dup=cand[0];
   if(!confirm(`犧牲另一位【${heroDef(h).name}】與他合成？全屬性永久 +2（${h.star||0}/3 → ${(h.star||0)+1}/3）`))return;
   S.heroes=S.heroes.filter(x=>x.uid!==dup.uid);
   h.star=(h.star||0)+1;
@@ -599,6 +601,7 @@ function renderWork(){
 }
 function startJob(uid){
   const h=S.heroes.find(x=>x.uid===uid); if(!h||h.job)return;
+  if(S.battle&&S.battle.heroUid===uid){ toast('戰鬥中不能派人打工！','var(--red)'); return; }
   if(h.fatigue>=80){ toast('疲勞紅燈，派不動','var(--red)'); return; }
   const sel=document.getElementById('jobsel_'+uid); h.job=sel.value; h.jobStart=Date.now(); questTick('job');
   toast(`${heroDef(h).name} 出門${JOBS.find(j=>j.id===h.job).name}去了`); save(); render();
@@ -663,6 +666,7 @@ function stallPrice(mat){ return Math.round(MATERIALS[mat].price*1.35); }
 function cardMarketPrice(cid){ const r=RECIPES.find(x=>x.out===cid); return r?Math.round(r.gold*1.3+20):50; }
 function openStall(uid){
   const h=S.heroes.find(x=>x.uid===uid); if(!h||h.job||h.fatigue>=80)return;
+  if(S.battle&&S.battle.heroUid===uid){ toast('戰鬥中不能去顧攤！','var(--red)'); return; }
   if(S.summoned===uid){ toast('召喚中的英雄不能同時看攤，先收回點將錄','var(--red)'); return; }
   S.stallHero=uid; toast(`${heroDef(h).name} 支起攤子開張了 🏪`); save(); render();
 }
@@ -670,7 +674,9 @@ function closeStall(){
   const h=S.heroes.find(x=>x.uid===S.stallHero);
   if(h){ h.fatigue=Math.min(100,h.fatigue+4);
     for(const it of S.stallStock){ if(it.cardId) S.inv.cards[it.cardId]=(S.inv.cards[it.cardId]||0)+it.count;
-      else S.inv.mats[it.mat]=(S.inv.mats[it.mat]||0)+it.count; } }
+      else { S.inv.mats[it.mat]=(S.inv.mats[it.mat]||0)+it.count;
+             // 非手作額度隨貨回庫，防「開攤收攤」洗白
+             if(it.nBought){ S.boughtMats=S.boughtMats||{}; S.boughtMats[it.mat]=(S.boughtMats[it.mat]||0)+Math.min(it.nBought,it.count); } } } }
   S.stallHero=null; S.stallStock=[]; toast('收攤，未售出商品已退回倉庫'); save(); render();
 }
 function stallList(mat){
@@ -685,7 +691,7 @@ function stallList(mat){
   if(nHand>0){ const ex=S.stallStock.find(x=>x.mat===mat&&!x.cardId&&x.price===stallPrice(mat));
     if(ex)ex.count+=nHand; else S.stallStock.push({mat,count:nHand,price:stallPrice(mat)}); }
   if(nBought>0){ const ex2=S.stallStock.find(x=>x.mat===mat&&!x.cardId&&x.price===pHalf);
-    if(ex2)ex2.count+=nBought; else S.stallStock.push({mat,count:nBought,price:pHalf}); }
+    if(ex2){ex2.count+=nBought; ex2.nBought=(ex2.nBought||0)+nBought;} else S.stallStock.push({mat,count:nBought,price:pHalf,nBought:nBought}); }
   if(nBought>0) toast(`${nBought} 個「非手作」材料只賣半價 🪙${pHalf}（顧客精明了）`,'var(--dim)');
   save(); render();
 }
@@ -849,7 +855,9 @@ function renderTavern(){
     <div class="stats">${d.lore}<br>${d.type}｜持有 ×${owned}</div></div>`;}).join('')}</div></div>`;
 }
 function pull(n){
-  const cost=(n===10?Math.round(PULL_COST*9):PULL_COST*n); if(S.gold<cost)return; S.gold-=cost;
+  const cost=(n===10?Math.round(PULL_COST*9):PULL_COST*n);
+  if(S.gold<cost){ toast(`金幣不足（需 🪙${cost}）`,'var(--red)'); return; }
+  S.gold-=cost;
   S.pity=(S.pity||0);
   const got=[]; let hasRare=false;
   for(let i=0;i<n;i++){
@@ -891,7 +899,12 @@ function renderBag(){
     <div style="text-align:center"><button class="act" ${sm?'':'disabled'} onclick="equipToSummoned('${cid}')">裝備</button></div></div>`;}).join('')}</div>`}
   </div>
   <div class="panel"><h2>📦 倉庫</h2><div class="mats">${Object.entries(MATERIALS).map(([k,v])=>`<span>${v.e} ${v.n} × ${S.inv.mats[k]||0}</span>`).join('')}</div></div>
-  <div class="panel"><h2>💾 存檔碼（跨裝置轉移）</h2>
+  <p class="hint" style="text-align:right">💡 存檔備份/轉移請看上方「💾 存檔」標籤。</p>`;
+}
+
+/* ---- 存檔標籤頁 ---- */
+function renderSave(){
+  return `<div class="panel"><h2>💾 存檔碼（跨裝置轉移）</h2>
   <p class="hint">「導出」把你的全部進度（英雄/等級/金幣/倉庫/圖鑑）轉成一串文字，複製到其他裝置（或清紀錄前備份）貼進「導入」即可還原。<b>注意：存檔碼是編碼不是加密</b>，懂技術的人可解開甚至竄改——自用備份用途即可。</p>
   <div class="row">
     <button class="act gold" onclick="exportSave()">📤 導出存檔碼</button>
@@ -899,12 +912,15 @@ function renderBag(){
   </div>
   <div id="savecode" style="margin-top:8px"></div>
   </div>
-  <div class="panel" style="text-align:right"><button class="act red" onclick="wipe()">🗑 重置存檔</button>
-  <span class="hint" style="margin-left:10px">v0.4 審計修復版｜存檔於 localStorage</span></div>`;
+  <div class="panel"><h2>⚠️ 危險區</h2>
+  <p class="hint">重置會直接清空本機進度，<b>沒有存檔碼就救不回來</b>——先導出再重置。</p>
+  <div style="text-align:right"><button class="act red" onclick="wipe()">🗑 重置存檔</button></div>
+  <span class="hint">v0.6｜存檔於 localStorage｜換裝置/清瀏覽器前務必先導出存檔碼</span></div>`;
 }
 function equipToSummoned(cid){
   if(!S.summoned)return;
   const h=S.heroes.find(x=>x.uid===S.summoned); if(!h||!S.inv.cards[cid])return;
+  if(S.battle&&S.battle.heroUid===h.uid){ toast('戰鬥中不能換裝！','var(--red)'); return; }
   if(h.slots.filter(Boolean).length>=slotsOf(h)){toast('插槽已滿','var(--red)');return;}
   if(h.slots.filter(x=>x===cid).length>=2){toast('同名卡最多插 2 張','var(--red)');return;}
   const i=h.slots.indexOf(null); h.slots[i]=cid; S.inv.cards[cid]--;
@@ -947,6 +963,10 @@ function importSave(){
     // 防呆：補齊舊版可能缺的欄位
     S.stallStock=S.stallStock||[]; S.stallLog=S.stallLog||[]; S.marketOffers=S.marketOffers||[];
     S.mercPool=S.mercPool||[]; S.marketDay=-1; S.mercDay=-1; S.battle=null; S.lastTick=Date.now();
+    S.quest=S.quest||{win:0,job:0,pull:0}; S.questClaimed=S.questClaimed||[];
+    S.pity=S.pity||0; S.pulls=S.pulls||0; S.boughtMats=S.boughtMats||{};
+    S.aggression=(typeof S.aggression==='number')?S.aggression:5;
+    S.aiMode=S.aiMode||'balance'; S.inv=S.inv||{mats:{},cards:{}}; S.inv.mats=S.inv.mats||{}; S.inv.cards=S.inv.cards||{};
     for(const h of S.heroes){ h.perm=h.perm||{str:0,vit:0,agi:0,wis:0,luk:0}; h.slots=h.slots||[null,null,null,null,null]; h.fatigue=h.fatigue||0; if(h.job&&!h.jobStart)h.jobStart=Date.now(); }
     save(); toast('✅ 存檔導入成功，進度已恢復！','var(--green)'); render();
   }catch(e){ toast('導入失敗：存檔碼損毀或無效','var(--red)'); }
