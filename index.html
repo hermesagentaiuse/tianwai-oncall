@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>天外召喚錄 — 卡片英雄 RPG v0.2</title>
+<style>
+:root{
+  --bg:#141a26; --panel:#1d2534; --panel2:#25304a; --line:#33405c;
+  --txt:#e8ecf4; --dim:#8fa0bd; --gold:#f0c75e; --green:#5ec97f; --red:#e06a5a; --blue:#5fa8e8; --purple:#a97fe8;
+}
+*{box-sizing:border-box;margin:0;padding:0;font-family:"PingFang TC","Microsoft JhengHei",sans-serif}
+body{background:radial-gradient(1200px 600px at 50% -100px,#1e2a44,var(--bg));color:var(--txt);min-height:100vh}
+#app{max-width:980px;margin:0 auto;padding:12px}
+header{display:flex;justify-content:space-between;align-items:center;background:linear-gradient(135deg,#1d2534,#2a3552);border:1px solid var(--line);border-radius:12px;padding:10px 16px;margin-bottom:10px;flex-wrap:wrap;gap:6px}
+header h1{font-size:20px;color:var(--gold);text-shadow:0 0 12px rgba(240,199,94,.4)}
+.res{display:flex;gap:14px;font-size:14px;flex-wrap:wrap}
+.res b{color:var(--gold)}
+nav{display:flex;gap:5px;margin-bottom:10px;flex-wrap:wrap}
+nav button{flex:1;min-width:82px;padding:9px 4px;background:var(--panel);border:1px solid var(--line);border-radius:9px;color:var(--dim);cursor:pointer;font-size:13px;transition:.15s}
+nav button:hover{color:var(--txt);border-color:var(--blue)}
+nav button.on{background:var(--panel2);color:var(--gold);border-color:var(--gold)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+.panel h2{font-size:16px;color:var(--blue);margin-bottom:10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+/* ---- 卡片美術 ---- */
+.card{background:linear-gradient(160deg,var(--panel2),#1a2338);border:1px solid var(--line);border-radius:12px;padding:10px;position:relative;overflow:hidden}
+.card::before{content:'';position:absolute;inset:0;background:radial-gradient(120px 60px at 50% 0%,rgba(255,255,255,.06),transparent);pointer-events:none}
+.card.r-N{border-color:#3a4a68}
+.card.r-R{border-color:#3d6ea8;box-shadow:inset 0 0 24px rgba(95,168,232,.12)}
+.card.r-SR{border-color:#8a5fd0;box-shadow:inset 0 0 26px rgba(169,127,232,.16)}
+.card.r-SSR{border-color:#c9a13f;box-shadow:inset 0 0 30px rgba(240,199,94,.22),0 0 10px rgba(240,199,94,.15)}
+.card.r-SSR::after{content:'';position:absolute;top:0;left:-60%;width:40%;height:100%;background:linear-gradient(105deg,transparent,rgba(255,255,255,.14),transparent);animation:shine 3.5s infinite}
+@keyframes shine{0%{left:-60%}55%{left:130%}100%{left:130%}}
+.card.sel{outline:2px solid var(--gold)}
+.card .emoji{font-size:40px;text-align:center;display:block;filter:drop-shadow(0 3px 6px rgba(0,0,0,.6))}
+.card .name{font-weight:bold;text-align:center;font-size:15px}
+.r-N{color:var(--dim)} .r-R{color:var(--blue)} .r-SR{color:var(--purple)} .r-SSR{color:var(--gold)}
+.badge{position:absolute;top:6px;right:6px;font-size:11px;padding:1px 6px;border-radius:8px;background:#0e1420;border:1px solid var(--line);z-index:1}
+.stats{font-size:12px;color:var(--dim);margin-top:6px;line-height:1.5}
+.bar{height:7px;background:#0e1420;border-radius:4px;overflow:hidden;margin:3px 0}
+.bar i{display:block;height:100%;border-radius:4px;transition:width .4s}
+button.act{background:#2e4a72;border:1px solid #45679c;color:#dceaff;border-radius:7px;padding:6px 12px;cursor:pointer;font-size:13px;margin-top:6px;transition:.12s}
+button.act:hover:not(:disabled){filter:brightness(1.25);transform:translateY(-1px)}
+button.act:disabled{opacity:.35;cursor:not-allowed}
+button.gold{background:#6b5320;border-color:#a9853a;color:#ffe9b0}
+button.red{background:#5a2c26;border-color:#8c453c;color:#ffd9d3}
+button.green{background:#2b5638;border-color:#4a8f60;color:#d3ffe0}
+.slots{display:flex;gap:6px;justify-content:center;margin-top:8px}
+.slot{width:42px;height:42px;border:1px dashed var(--line);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:19px;cursor:pointer;background:#0e1420;transition:.15s}
+.slot.full{border-style:solid;border-color:var(--green)}
+.slot:hover{border-color:var(--gold)}
+.hint{font-size:12px;color:var(--dim);line-height:1.6}
+#battlelog{height:170px;overflow-y:auto;background:#0e1420;border-radius:8px;padding:8px;font-size:13px;line-height:1.6;margin-top:8px}
+.hpnum{font-size:11px;color:var(--dim)}
+.light{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px}
+.green{background:var(--green)} .redl{background:var(--red)}
+select{background:#0e1420;color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:5px;font-size:13px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#0e1420;border:1px solid var(--gold);color:var(--gold);padding:10px 22px;border-radius:10px;z-index:99;font-size:14px;box-shadow:0 4px 18px rgba(0,0,0,.5);animation:pop .25s}
+@keyframes pop{from{transform:translate(-50%,14px);opacity:0}}
+.mats{display:flex;gap:8px;flex-wrap:wrap;font-size:13px}
+.mats span{background:#0e1420;border:1px solid var(--line);border-radius:8px;padding:4px 9px}
+.modalbg{position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:50;animation:pop .2s}
+.modal{background:var(--panel);border:1px solid var(--gold);border-radius:12px;padding:18px;max-width:460px;width:92%;max-height:88vh;overflow-y:auto}
+.vs{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.vs .side{flex:1;text-align:center;position:relative}
+.vs .side .big{font-size:44px;display:inline-block;transition:.1s}
+.shake{animation:shake .3s}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-7px)}75%{transform:translateX(7px)}}
+.flash{animation:flash .35s}
+@keyframes flash{50%{filter:brightness(3)}}
+.dmgfloat{position:absolute;top:6px;left:50%;transform:translateX(-50%);font-weight:bold;font-size:18px;animation:rise .9s forwards;pointer-events:none;text-shadow:0 2px 4px #000}
+@keyframes rise{to{transform:translate(-50%,-34px);opacity:0}}
+.summonfx{position:fixed;inset:0;background:radial-gradient(circle at 50% 55%,rgba(240,199,94,.35),transparent 60%);z-index:60;pointer-events:none;animation:fadeout .8s forwards}
+@keyframes fadeout{to{opacity:0}}
+h3.sub{font-size:13px;color:var(--dim);margin:10px 0 4px}
+.small{font-size:12px}
+.price{color:var(--gold);font-size:12px}
+.tag{font-size:11px;background:#0e1420;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:var(--dim)}
+</style>
+</head>
+<body>
+<div id="app">
+<header>
+  <h1>🎴 天外召喚錄 <span style="font-size:11px;color:var(--dim)">v0.2</span></h1>
+  <div class="res">
+    <span>🪙 <b id="rGold">0</b></span>
+    <span>主君 Lv.<b id="rLv">1</b></span>
+    <span id="rSummoned" class="small"></span>
+    <span id="rStall" class="small"></span>
+  </div>
+</header>
+<nav id="nav"></nav>
+<div id="main"></div>
+</div>
+<div id="toasts"></div>
+<div id="modal"></div>
+
+<script>
+/* ================= 資料定義 ================= */
+const HERO_DEFS = [
+  {id:'guanyu',   name:'關雲長', emoji:'⚔️', type:'武者', rarity:'SSR', base:{str:14,vit:13,agi:8,wis:7,luk:8},  ranged:false, lore:'義薄雲天的武聖，刀法出神入化。'},
+  {id:'lubu',     name:'呂奉先', emoji:'👑', type:'武者', rarity:'SSR', base:{str:16,vit:12,agi:10,wis:4,luk:6},  ranged:false, lore:'人中呂馬，戰力天花板但無福之相。'},
+  {id:'zhugeliang',name:'諸葛孔明',emoji:'🪶',type:'策士', rarity:'SSR', base:{str:5,vit:8,agi:8,wis:17,luk:11},  ranged:true,  lore:'羽扇綸巾，借風借火借箭。'},
+  {id:'zhaoyun',  name:'趙子龍', emoji:'🐉', type:'武者', rarity:'SR',  base:{str:12,vit:11,agi:11,wis:7,luk:9},  ranged:false, lore:'七進七出的常勝將軍。'},
+  {id:'huangzhong',name:'黃漢升',emoji:'🏹', type:'響馬', rarity:'SR',  base:{str:10,vit:9,agi:14,wis:7,luk:9},   ranged:true,  lore:'百步穿楊的老將，狙擊一流。'},
+  {id:'pangtong', name:'龐士元', emoji:'📜', type:'策士', rarity:'SR',  base:{str:5,vit:8,agi:7,wis:14,luk:10},   ranged:true,  lore:'鳳雛先生，奇謀百出。'},
+  {id:'moli',     name:'花木蘭', emoji:'🌸', type:'響馬', rarity:'SR',  base:{str:11,vit:10,agi:13,wis:8,luk:9},  ranged:true,  lore:'木蘭從軍，巾幗不讓鬚眉。'},
+  {id:'nezha',    name:'哪吒',   emoji:'🔥', type:'武者', rarity:'SR',  base:{str:12,vit:9,agi:13,wis:6,luk:10},  ranged:false, lore:'三頭六臂，風火輪少年。'},
+  {id:'sunjian',  name:'孫文台', emoji:'🐯', type:'響馬', rarity:'R',   base:{str:10,vit:9,agi:12,wis:7,luk:10},  ranged:true,  lore:'江東小霸王，弓馬嫻熟。'},
+  {id:'zhangjiao',name:'張角',   emoji:'⚡', type:'仙士', rarity:'R',   base:{str:6,vit:8,agi:11,wis:13,luk:8},   ranged:true,  lore:'黃天當立，妖術惑眾。'},
+  {id:'huatuo',   name:'華元化', emoji:'🌿', type:'仙士', rarity:'R',   base:{str:5,vit:10,agi:9,wis:13,luk:10},  ranged:false, lore:'青囊妙手，醫者仁心。'},
+  {id:'luban',    name:'魯班',   emoji:'🔨', type:'工匠', rarity:'R',   base:{str:8,vit:10,agi:11,wis:9,luk:12},  ranged:false, lore:'機巧天工，什麼都能修。'},
+  {id:'dongzhuo', name:'董太師', emoji:'🏮', type:'工匠', rarity:'R',   base:{str:9,vit:12,agi:6,wis:9,luk:9},    ranged:false, lore:'富可敵國的权臣，錢能推鬼。'},
+  {id:'liubei',   name:'劉玄德', emoji:'🏵️',type:'策士', rarity:'N',   base:{str:6,vit:8,agi:7,wis:11,luk:13},  ranged:false, lore:'哭出來的天下，仁德服人。'},
+  {id:'zhangfei', name:'張翼德', emoji:'🍷', type:'武者', rarity:'N',   base:{str:12,vit:10,agi:6,wis:4,luk:7},  ranged:false, lore:'燕人張翼德，當陽橋一聲吼。'},
+  {id:'diaochan', name:'貂蟬',   emoji:'🌙', type:'仙士', rarity:'N',   base:{str:4,vit:8,agi:10,wis:11,luk:12}, ranged:true,  lore:'閉月之姿，一舞傾城。'},
+  {id:'chengyuan',name:'程遠志', emoji:'🪓', type:'武者', rarity:'N',   base:{str:9,vit:8,agi:6,wis:4,luk:6},    ranged:false, lore:'黃巾副將，聊勝於無。'},
+  {id:'xiahou',   name:'夏侯惇', emoji:'🛡️',type:'響馬', rarity:'N',   base:{str:9,vit:9,agi:8,wis:6,luk:8},    ranged:true,  lore:'拔矢啖睛的獨眼將軍。'},
+];
+const TYPE_GROWTH = {
+  武者:{str:2,vit:2,agi:1,wis:0,luk:1}, 響馬:{agi:2,luk:2,str:1,vit:1,wis:0},
+  策士:{wis:2,luk:2,str:0,vit:1,agi:1}, 仙士:{wis:2,agi:2,str:0,vit:1,luk:1},
+  工匠:{agi:1,luk:3,str:1,vit:1,wis:1},
+};
+const STAT_CN={str:'力量',vit:'體質',agi:'敏捷',wis:'智慧',luk:'運氣'};
+const CARD_DEFS = {
+  sk_fire:{id:'sk_fire',kind:'skill',name:'火箭術',emoji:'🔥',desc:'每回合 20% 機率發動，傷害 1.8 倍',rate:.20,mult:1.8},
+  sk_thunder:{id:'sk_thunder',kind:'skill',name:'落雷術',emoji:'⚡',desc:'每回合 15% 機率發動，傷害 2.4 倍',rate:.15,mult:2.4},
+  sk_heal:{id:'sk_heal',kind:'skill',name:'癒傷術',emoji:'💚',desc:'每回合 18% 機率自身回 15% HP',heal:.15},
+  sk_talisman:{id:'sk_talisman',kind:'skill',name:'降魔符',emoji:'🈲',desc:'每回合 20% 機率敵人下回合傷害減半',debuff:.5},
+  sk_rage:{id:'sk_rage',kind:'skill',name:'蕩刀式',emoji:'🌀',desc:'每回合 22% 機率發動，傷害 1.6 倍',rate:.22,mult:1.6},
+  sk_taunt:{id:'sk_taunt',kind:'skill',name:'全體挑釁',emoji:'📢',desc:'每回合 15% 機率敵人兩回合內只打你（配合護衛型AI減傷）',taunt:2},
+  eq_sword:{id:'eq_sword',kind:'equip',name:'鐵劍卡',emoji:'🗡️',desc:'力量+4',bonus:{str:4}},
+  eq_blade:{id:'eq_blade',kind:'equip',name:'青龍刀卡',emoji:'🔪',desc:'力量+8（昂貴）',bonus:{str:8}},
+  eq_armor:{id:'eq_armor',kind:'equip',name:'皮甲卡',emoji:'🥋',desc:'體質+4',bonus:{vit:4}},
+  eq_helm:{id:'eq_helm',kind:'equip',name:'銅盔卡',emoji:'⛑️',desc:'體質+2、運氣+2',bonus:{vit:2,luk:2}},
+  eq_boots:{id:'eq_boots',kind:'equip',name:'輕靴卡',emoji:'👢',desc:'敏捷+4',bonus:{agi:4}},
+  eq_amulet:{id:'eq_amulet',kind:'equip',name:'玉佩卡',emoji:'📿',desc:'運氣+5',bonus:{luk:5}},
+  eq_tome:{id:'eq_tome',kind:'equip',name:'兵法書卡',emoji:'📖',desc:'智慧+4',bonus:{wis:4}},
+  eq_bowstring:{id:'eq_bowstring',kind:'equip',name:'名弓弦卡',emoji:'🎯',desc:'敏捷+6（遠程最愛）',bonus:{agi:6}},
+};
+const MONSTERS = [
+  {id:'boar', name:'野豬',emoji:'🐗',lv:1,hp:55,atk:6,def:1,gold:14,exp:10,drops:{hide:1},drate:.7},
+  {id:'bandit',name:'山賊',emoji:'🪓',lv:2,hp:90,atk:10,def:3,gold:28,exp:18,drops:{cloth:1,wood:1},drate:.5},
+  {id:'wolf', name:'黑風狼',emoji:'🐺',lv:3,hp:140,atk:14,def:4,gold:45,exp:30,drops:{hide:2,herb:1},drate:.5},
+  {id:'golem',name:'岩磐鬼',emoji:'🗿',lv:5,hp:240,atk:19,def:9,gold:80,exp:50,drops:{ore:2,stone:1},drate:.6},
+  {id:'fox',  name:'妖狐',emoji:'🦊',lv:6,hp:200,atk:26,def:5,gold:105,exp:65,drops:{herb:2,sand:1},drate:.5},
+  {id:'oni',  name:'夜叉',emoji:'👹',lv:8,hp:380,atk:36,def:11,gold:180,exp:110,drops:{ore:2,hide:2,sand:2},drate:.6},
+  {id:'dragon',name:'蛟龍',emoji:'🐲',lv:10,hp:650,atk:52,def:16,gold:400,exp:220,drops:{sand:3,ore:3,stone:2},drate:.75},
+];
+/* 天外八種 AI 模式（原版規則表） */
+const AI_MODES = {
+  sweep: {name:'掃蕩',desc:'自由搜尋：攻+25%，受傷+25%',dmgM:1.25,takeM:1.25,dropM:1.1},
+  decoy: {name:'誘敵',desc:'遊走引敵：攻-5%，受傷+15%，掉落率+20%',dmgM:.95,takeM:1.15,dropM:1.2},
+  patrol:{name:'巡狩',desc:'跟隨主動：攻+5%，受傷+5%',dmgM:1.05,takeM:1.05},
+  guard: {name:'護衛',desc:'被打才反擊：攻-30%，受傷-35%',dmgM:.7,takeM:.65},
+  round: {name:'巡邏',desc:'緊跟不離：攻持平，受傷-20%',dmgM:1.0,takeM:.8},
+  flank: {name:'掠陣',desc:'傍身反擊：攻-20%，受傷-30%',dmgM:.8,takeM:.7},
+  snipe: {name:'狙擊',desc:'原地遠攻：遠程攻+30%（近戰英雄禁用）',dmgM:1.3,takeM:1.0,needRanged:true},
+  hold:  {name:'固守',desc:'死守原地：攻-40%，受傷-45%，反傷 15%',dmgM:.6,takeM:.55,thorns:.15},
+};
+const JOBS = [
+  {id:'woodcutter',name:'伐木',emoji:'🪓',mat:'wood',matName:'木材',rate:0.6,hint:'每 20 秒約 0.6 單位'},
+  {id:'mining',    name:'挖礦',emoji:'⛏️',mat:'ore', matName:'礦石',rate:0.5,hint:'每 20 秒約 0.5 單位'},
+  {id:'herbing',   name:'採集',emoji:'🌿',mat:'herb',matName:'藥草',rate:0.5,hint:'每 20 秒約 0.5 單位'},
+  {id:'hunting',   name:'狩獵',emoji:'🏹',mat:'hide',matName:'獸皮',rate:0.55,hint:'每 20 秒約 0.55 單位'},
+  {id:'sanding',   name:'採砂',emoji:'⏳',mat:'sand',matName:'靈砂',rate:0.3,hint:'每 20 秒約 0.3 單位（高價）'},
+  {id:'weaving',   name:'紡織',emoji:'🧵',mat:'cloth',matName:'布匹',rate:0.55,hint:'每 20 秒約 0.55 單位'},
+  {id:'quarrying', name:'採石',emoji:'🪨',mat:'stone',matName:'石料',rate:0.6,hint:'每 20 秒約 0.6 單位'},
+];
+const JOB_BASE = {woodcutter:'str',mining:'vit',herbing:'luk',hunting:'agi',sanding:'luk',weaving:'agi',quarrying:'str'};
+const MATERIALS = {wood:{n:'木材',e:'🪵',price:8},ore:{n:'礦石',e:'⛏️',price:14},herb:{n:'藥草',e:'🌿',price:18},
+  hide:{n:'獸皮',e:'🟤',price:11},sand:{n:'靈砂',e:'⏳',price:30},cloth:{n:'布匹',e:'🧵',price:12},stone:{n:'石料',e:'🪨',price:7}};
+const RECIPES = [
+  {out:'eq_sword',   cost:{ore:3,wood:1},        gold:25},
+  {out:'eq_blade',   cost:{ore:6,stone:2,wood:2},gold:90},
+  {out:'eq_armor',   cost:{hide:3,cloth:1},      gold:25},
+  {out:'eq_helm',    cost:{ore:2,hide:1},        gold:18},
+  {out:'eq_boots',   cost:{cloth:2,hide:1},      gold:18},
+  {out:'eq_amulet',  cost:{sand:3,ore:1},        gold:40},
+  {out:'eq_tome',    cost:{cloth:2,herb:2},      gold:30},
+  {out:'eq_bowstring',cost:{hide:2,sand:1},      gold:45},
+  {out:'sk_fire',    cost:{herb:2,sand:1},       gold:50},
+  {out:'sk_thunder', cost:{sand:2,herb:1,ore:1}, gold:70},
+  {out:'sk_heal',    cost:{herb:3,cloth:1},      gold:55},
+  {out:'sk_talisman',cost:{sand:2,cloth:2},      gold:60},
+  {out:'sk_rage',    cost:{hide:2,ore:2},        gold:55},
+  {out:'sk_taunt',   cost:{stone:3,cloth:1},     gold:45},
+];
+const PULL_COST = 80;
+const SAVE_KEY = 'tianwai_save_v2';
+
+/* ================= 狀態 ================= */
+let S = null;
+function defaultState(){
+  return {
+    gold:200, lv:1, exp:0,
+    heroes:[], summoned:null, aiMode:'patrol', aggression:7, battle:null,
+    inv:{cards:{}, mats:{}},
+    stallHero:null, stallStock:[],            // 擺攤
+    marketDay:0, marketOffers:[], marketRefreshedAt:0, // 行腳商人
+    mercPool:[], mercDay:-1,                  // 每日傭兵池
+    lastTick:Date.now(), pulls:0, stallLog:[],
+  };
+}
+function save(){ S.lastTick=Date.now(); localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }
+function load(){
+  try{ const d=localStorage.getItem(SAVE_KEY); if(d){ S=JSON.parse(d); return; } }catch(e){}
+  S=defaultState();
+  S.heroes.push(makeHero('guanyu'), makeHero('zhangfei'));
+  S.inv.cards.eq_sword=1; S.inv.cards.sk_fire=1;
+}
+/* ================= 工具 ================= */
+const $=s=>document.querySelector(s);
+const heroDef=h=>{ const d=HERO_DEFS.find(x=>x.id===h.defId); return d||{name:h.name||'傭兵',emoji:h.emoji||'🗡️',type:h.type||'武者',rarity:'R',ranged:!!h.ranged,lore:''}; };
+function toast(msg,color){
+  const el=document.createElement('div'); el.className='toast'; el.textContent=msg;
+  if(color){el.style.borderColor=color;el.style.color=color;}
+  $('#toasts').appendChild(el); setTimeout(()=>el.remove(),2600);
+}
+function heroStats(h){
+  const d=heroDef(h); const g=TYPE_GROWTH[d.type]||TYPE_GROWTH.武者;
+  const st={}; for(const k of ['str','vit','agi','wis','luk']) st[k]=(d.base?d.base[k]:8)+g[k]*(h.lvl-1)+(h.perm[k]||0);
+  for(const slot of h.slots){ if(!slot)continue; const c=CARD_DEFS[slot]; if(c&&c.bonus)for(const k in c.bonus)st[k]+=c.bonus[k]; }
+  return st;
+}
+function heroPower(h){const s=heroStats(h);return Math.round(s.str*3+s.vit*3+s.agi*2+s.wis*2+s.luk*1);}
+function heroHp(h){const s=heroStats(h);return Math.round(30+s.vit*8+h.lvl*4);}
+function heroAtk(h){const s=heroStats(h);const d=heroDef(h);return Math.round((d.ranged? s.agi*1.6+s.wis*.6 : s.str*1.8)+h.lvl*2+3);}
+function heroDef_(h){const s=heroStats(h);return Math.round(s.vit*.8+s.agi*.4);}
+function heroCrit(h){const s=heroStats(h);return Math.min(.35, s.luk/200+s.agi/400);}
+function expNeed(l){return l*l*30+50;}
+function slotsOf(h){return {N:3,R:3,SR:4,SSR:5}[heroDef(h).rarity]||3;}
+function makeHero(defId,lvl=1){
+  const d=HERO_DEFS.find(x=>x.id===defId);
+  return {uid:defId+'_'+Math.random().toString(36).slice(2,7), defId, lvl, exp:0, fatigue:0,
+          perm:{str:0,vit:0,agi:0,wis:0,luk:0}, slots:[null,null,null,null,null], job:null, jobStart:0};
+}
+function weightedPick(weights){
+  let t=0;for(const k in weights)t+=weights[k];let r=Math.random()*t;
+  for(const k in weights){r-=weights[k];if(r<=0)return k;}return Object.keys(weights)[0];
+}
+function today(){return Math.floor(Date.now()/86400000);}
+function summonFx(){const el=document.createElement('div');el.className='summonfx';document.body.appendChild(el);setTimeout(()=>el.remove(),800);}
+function floatDmg(sideId,txt,color){
+  const side=document.getElementById(sideId); if(!side)return;
+  const f=document.createElement('div');f.className='dmgfloat';f.style.color=color;f.textContent=txt;
+  side.appendChild(f);setTimeout(()=>f.remove(),900);
+  const big=side.querySelector('.big'); if(big){big.classList.add('shake');setTimeout(()=>big.classList.remove('shake'),350);}
+}
+
+/* ================= 離線結算 ================= */
+function offlineProgress(){
+  const now=Date.now();
+  const elapsed=Math.min((now-(S.lastTick||now))/1000, 8*3600);
+  if(elapsed<1) return;
+  const notes=[];
+  for(const h of S.heroes){
+    if(h.job){
+      const j=JOBS.find(x=>x.id===h.job); const st=heroStats(h);
+      const eff=(st[JOB_BASE[j.id]]||8)/16 * j.rate;
+      const gain=Math.floor(elapsed/20*eff*(1+h.lvl*.08));
+      if(gain>0){ S.inv.mats[j.mat]=(S.inv.mats[j.mat]||0)+gain;
+        notes.push(`${heroDef(h).name} 打工帶回 ${j.matName}×${gain}`); }
+      h.fatigue=Math.min(100,h.fatigue+elapsed*0.002);
+    } else if(S.summoned!==h.uid && S.stallHero!==h.uid){
+      h.fatigue=Math.max(0,h.fatigue-elapsed*0.015);
+    }
+  }
+  // 離線攤販：每 90 秒一位顧客（運氣加成），按存貨結算
+  if(S.stallHero && S.stallStock.length){
+    const h=S.heroes.find(x=>x.uid===S.stallHero);
+    if(h){
+      const st=heroStats(h);
+      let customers=Math.floor(elapsed/90*(0.8+st.luk/30));
+      let revenue=0, sold=[];
+      while(customers-->0 && S.stallStock.length){
+        const it=S.stallStock[Math.floor(Math.random()*S.stallStock.length)];
+        revenue+=it.price; sold.push(`${MATERIALS[it.mat]?MATERIALS[it.mat].e:''}${it.price}🪙`);
+        it.count--; if(it.count<=0) S.stallStock=S.stallStock.filter(x=>x!==it);
+      }
+      if(revenue>0){ S.gold+=revenue; notes.push(`你的攤位離線期間進帳 🪙${revenue}`); }
+    }
+  }
+  if(notes.length) setTimeout(()=>toast('⏰ '+notes[0]+' 等離線收益'),400);
+}
+
+/* ================= 導覽 ================= */
+let tab='roster';
+const TABS=[['roster','📖 點將錄'],['battle','⚔️ 歷練'],['work','🧺 打工'],['academy','🏫 學院'],['stall','🏪 擺攤'],['merc','🗡️ 傭兵'],['market','🛒 市場'],['forge','🔨 鍛造'],['tavern','🎴 客棧'],['bag','🎒 背包']];
+function renderNav(){
+  $('#nav').innerHTML=TABS.map(([id,n])=>`<button class="${tab===id?'on':''}" onclick="setTab('${id}')">${n}</button>`).join('');
+  $('#rGold').textContent=S.gold; $('#rLv').textContent=S.lv;
+  const sm=S.summoned&&S.heroes.find(h=>h.uid===S.summoned);
+  $('#rSummoned').textContent=sm?`召喚中：${heroDef(sm).emoji}${heroDef(sm).name}`:'';
+  const sh=S.stallHero&&S.heroes.find(h=>h.uid===S.stallHero);
+  $('#rStall').textContent=sh?`看攤：${heroDef(sh).emoji}`:'';
+}
+function setTab(t){ tab=t; render(); }
+function render(){
+  renderNav(); const m=$('#main');
+  const f={roster:renderRoster,battle:renderBattle,work:renderWork,academy:renderAcademy,
+           stall:renderStall,merc:renderMerc,market:renderMarket,forge:renderForge,tavern:renderTavern,bag:renderBag}[tab];
+  m.innerHTML=f();
+}
+
+/* ---- 點將錄 ---- */
+function busy(h){ return !!h.job || S.stallHero===h.uid; }
+function renderRoster(){
+  if(S.heroes.length===0) return `<div class="panel"><p class="hint">點將錄空空如也…去「客棧抽卡」吧！</p></div>`;
+  const sorted=[...S.heroes].sort((a,b)=>heroPower(b)-heroPower(a));
+  return `<div class="panel"><h2>📖 點將錄（${S.heroes.length} 張英雄卡）</h2>
+  <p class="hint">同時只能召喚 <b>1 位</b>，且不能高於主君 Lv.${S.lv}。疲勞紅燈需休養。插槽數：N/R 3、SR 4、SSR 5。</p>
+  <div class="grid">${sorted.map(h=>{
+    const d=heroDef(h), st=heroStats(h), red=h.fatigue>=80, summoned=S.summoned===h.uid;
+    const slots=[];
+    for(let i=0;i<slotsOf(h);i++){ const c=h.slots[i];
+      slots.push(`<div class="slot ${c?'full':''}" title="${c?CARD_DEFS[c].name+'（點擊卸下）':'空插槽（背包點裝備）'}" onclick="unequip('${h.uid}',${i})">${c?CARD_DEFS[c].emoji:'＋'}</div>`); }
+    const canSummon=!red&&!busy(h)&&h.lvl<=S.lv&&!S.battle;
+    return `<div class="card r-${d.rarity} ${summoned?'sel':''}">
+      <span class="badge r-${d.rarity}">${d.rarity}</span>
+      <span class="emoji">${d.emoji}</span>
+      <div class="name">${d.name} <span class="small">Lv.${h.lvl}</span></div>
+      <div class="small" style="text-align:center;color:var(--dim)">${d.type}${d.ranged?'・遠程':''}　⚡${heroPower(h)}</div>
+      <div class="stats">力${st.str} 體${st.vit} 敏${st.agi} 智${st.wis} 運${st.luk}<br>HP ${heroHp(h)}｜攻 ${heroAtk(h)}｜防 ${heroDef_(h)}</div>
+      <div class="bar" title="經驗"><i style="width:${Math.min(100,h.exp/expNeed(h.lvl)*100)}%;background:var(--blue)"></i></div>
+      <div class="bar"><i style="width:${h.fatigue}%;background:${red?'var(--red)':'var(--green)'}"></i></div>
+      <div class="small" style="text-align:center"><span class="light ${red?'redl':'green'}"></span>${red?'疲勞紅燈':(h.job?'打工中':(S.stallHero===h.uid?'看攤中':'狀態正常'))}
+        ${Object.values(h.perm).some(v=>v<0)?'<span style="color:var(--red)">（戰死損傷↓）</span>':''}</div>
+      <div class="slots">${slots.join('')}</div>
+      <div style="text-align:center">${summoned?`<button class="act red" onclick="unsummon()">收回點將錄</button>`
+        :`<button class="act gold" ${canSummon?'':'disabled'} onclick="summon('${h.uid}')">召喚</button>`}</div>
+    </div>`;}).join('')}</div></div>`;
+}
+function summon(uid){
+  const h=S.heroes.find(x=>x.uid===uid); if(!h)return;
+  S.summoned=uid; summonFx(); toast(`${heroDef(h).emoji} ${heroDef(h).name} 現出實體！`); save(); render();
+}
+function unsummon(){ S.summoned=null; save(); render(); toast('英雄化卡歸隊，開始恢復疲勞。'); }
+function unequip(uid,i){
+  const h=S.heroes.find(x=>x.uid===uid); if(!h||!h.slots[i])return;
+  const c=h.slots[i]; h.slots[i]=null; S.inv.cards[c]=(S.inv.cards[c]||0)+1;
+  toast(`卸下 ${CARD_DEFS[c].name}`); save(); render();
+}
+
+/* ---- 戰鬥 ---- */
+let battleMon=null;
+function renderBattle(){
+  if(S.battle) return renderBattleActive();
+  const sm=S.summoned&&S.heroes.find(h=>h.uid===S.summoned);
+  const modes=Object.entries(AI_MODES).map(([k,m])=>{
+    const dis=m.needRanged&&!(sm&&heroDef(sm).ranged);
+    return `<button class="act" style="${S.aiMode===k?'border-color:var(--gold);background:#4a4420':''}" onclick="setAI('${k}')">${m.name}<br><span class="small">${m.desc}</span></button>`;
+  }).join('');
+  return `
+  <div class="panel"><h2>🧠 英雄戰術（天外八式 AI）</h2>
+    <div class="row">${modes}</div>
+    <div class="row" style="margin-top:10px">
+      <span class="small" id="aggrlabel">積極度 ${S.aggression}/10（技能觸發機率 × 積極度/10）</span>
+      <input type="range" min="1" max="10" value="${S.aggression}" oninput="S.aggression=+this.value;document.getElementById('aggrlabel').textContent='積極度 '+S.aggression+'/10（技能觸發機率 × 積極度/10）'" onchange="save()">
+    </div>
+    ${sm?'':`<p class="hint" style="margin-top:8px;color:var(--red)">⚠️ 未召喚英雄。先至「點將錄」召喚，或至「傭兵」租借。</p>`}
+  </div>
+  <div class="panel"><h2>⚔️ 選擇歷練對象</h2><div class="grid">
+  ${MONSTERS.map(mon=>{
+    const canFight=sm&&!busy(sm)&&mon.lv<=(sm.lvl+3);
+    const hint=mon.lv>(sm?sm.lvl+3:3)?'（太強）':'';
+    return `<div class="card"><span class="badge">Lv.${mon.lv}</span><span class="emoji">${mon.emoji}</span>
+    <div class="name">${mon.name}${hint}</div>
+    <div class="stats">HP ${mon.hp}｜攻 ${mon.atk}｜防 ${mon.def}<br>掉落：${Object.entries(mon.drops).map(([m,n])=>MATERIALS[m].e+'×'+n).join(' ')}<br>🪙${mon.gold}｜EXP ${mon.exp}</div>
+    <div style="text-align:center"><button class="act red" ${canFight?'':'disabled'} onclick="startBattle('${mon.id}')">出戰</button></div>
+    </div>`;}).join('')}
+  </div></div>`;
+}
+function renderBattleActive(){
+  const b=S.battle, h=S.heroes.find(x=>x.uid===b.heroUid), d=heroDef(h), mon=MONSTERS.find(m=>m.id===b.monId);
+  return `<div class="panel"><h2>⚔️ ${d.name} vs ${mon.name}（${AI_MODES[S.aiMode].name}・積極度${S.aggression}）</h2>
+  <div class="vs">
+    <div class="side" id="sideHero"><span class="big">${d.emoji}</span><div>${d.name} Lv.${h.lvl}</div>
+      <div class="bar"><i style="width:${Math.max(0,b.hp)/b.hpMax*100}%;background:var(--green)"></i></div><div class="hpnum">${Math.max(0,Math.round(b.hp))}/${b.hpMax}</div></div>
+    <div style="font-size:22px;color:var(--gold)">⚡</div>
+    <div class="side" id="sideMon"><span class="big">${mon.emoji}</span><div>${mon.name}</div>
+      <div class="bar"><i style="width:${Math.max(0,b.monHp)/b.monMax*100}%;background:var(--red)"></i></div><div class="hpnum">${Math.max(0,Math.round(b.monHp))}/${b.monMax}</div></div>
+  </div>
+  <div id="battlelog">${b.log.map(l=>`<div>${l}</div>`).join('')}</div>
+  <div class="row" style="margin-top:8px">
+    ${b.over?`<button class="act gold" onclick="endBattle()">結束戰鬥</button>`:`<button class="act red" onclick="flee()">逃離戰場</button>`}
+  </div></div>`;
+}
+function setAI(k){ S.aiMode=k; render(); }
+function myHeroForBattle(){
+  if(!S.summoned) return null;
+  return S.heroes.find(h=>h.uid===S.summoned && !busy(h))||null;
+}
+function startBattle(mid){
+  const h=myHeroForBattle(); if(!h) return;
+  const mon=MONSTERS.find(m=>m.id===mid);
+  if(mon.lv>h.lvl+3){ toast('等級差距過大，英雄不敢應戰','var(--red)');return; }
+  S.battle={heroUid:h.uid, monId:mid, hp:heroHp(h), hpMax:heroHp(h), monHp:mon.hp, monMax:mon.hp,
+            log:[`【${heroDef(h).name}】（${AI_MODES[S.aiMode].name}）向 ${mon.name} 發起挑戰！`], over:false, monDebuff:1, tauntRounds:0};
+  render(); S.battle.timer=setInterval(battleTick,750); battleTick();
+}
+function battleTick(){
+  const b=S.battle; if(!b||b.over)return;
+  const h=S.heroes.find(x=>x.uid===b.heroUid), d=heroDef(h), mon=MONSTERS.find(m=>m.id===b.monId);
+  const ai=AI_MODES[S.aiMode];
+  // 英雄行動
+  let atk=heroAtk(h)*ai.dmgM*(0.85+Math.random()*0.3);
+  let crit=Math.random()<heroCrit(h); if(crit)atk*=1.5;
+  let skillTxt='';
+  for(const slot of h.slots){
+    if(!slot)continue; const c=CARD_DEFS[slot]; if(c.kind!=='skill')continue;
+    const p=(c.rate||0)*S.aggression/10;
+    if(Math.random()<p){
+      if(c.heal){const amt=Math.round(b.hpMax*c.heal);b.hp=Math.min(b.hpMax,b.hp+amt);skillTxt=`✨${c.name} 回${amt}`;floatDmg('sideHero','+'+amt,'var(--green)');continue;}
+      if(c.debuff){b.monDebuff=c.debuff;skillTxt=`🈲${c.name} 壓制`;continue;}
+      if(c.taunt){b.tauntRounds=c.taunt;skillTxt=`📢${c.name} 挑釁！`;continue;}
+      if(c.mult){atk*=c.mult;skillTxt=`${c.emoji}${c.name}爆發！`;break;}
+    }
+  }
+  let dmg=Math.max(1,Math.round(atk-mon.def));
+  b.monHp-=dmg;
+  floatDmg('sideMon','-'+dmg,crit?'var(--gold)':'var(--red)');
+  const el0=$('#battlelog');
+  b.log.push(`${d.emoji} ${d.name} ${crit?'會心一擊':''}造成 ${dmg} ${skillTxt}`);
+  if(b.monHp<=0){b.over=true;b.win=true;clearInterval(b.timer);b.log.push(`🏆 ${mon.name} 倒下了！`);render();return;}
+  // 怪物行動
+  let matk=mon.atk*ai.takeM*b.monDebuff*(0.85+Math.random()*0.3);
+  if(b.tauntRounds>0){ matk*=1.15; b.tauntRounds--; } // 被挑釁：怒氣漲但只能打英雄
+  b.monDebuff=1;
+  let mdmg=Math.max(1,Math.round(matk-heroDef_(h)));
+  b.hp-=mdmg; floatDmg('sideHero','-'+mdmg,'var(--red)');
+  b.log.push(`${mon.emoji} ${mon.name} 反擊 ${mdmg}`);
+  if(ai.thorns&&mdmg>0){ const t=Math.round(mdmg*ai.thorns); b.monHp-=t; b.log.push(`🛡️ 固守反傷 ${t}`); }
+  if(b.hp<=0){b.over=true;b.win=false;clearInterval(b.timer);b.log.push(`☠️ ${d.name} 戰死沙場……`);render();return;}
+  b.log=b.log.slice(-40);
+  const el=$('#battlelog'); if(el)$('#main').innerHTML=renderBattleActive();
+}
+function flee(){
+  const b=S.battle; if(!b)return; clearInterval(b.timer);
+  const h=S.heroes.find(x=>x.uid===b.heroUid);
+  h.fatigue=Math.min(100,h.fatigue+8); S.battle=null; save(); render(); toast('逃離戰場，疲勞 +8','var(--dim)');
+}
+function endBattle(){
+  const b=S.battle; if(!b)return; clearInterval(b.timer);
+  const h=S.heroes.find(x=>x.uid===b.heroUid), d=heroDef(h), mon=MONSTERS.find(m=>m.id===b.monId);
+  const isMerc=!!h.merc;
+  h.fatigue=Math.min(100,h.fatigue+12+mon.lv*3+Math.round(Math.random()*6));
+  if(b.win){
+    const ai=AI_MODES[S.aiMode];
+    let g=Math.round(mon.gold*(0.9+Math.random()*0.2));
+    if(isMerc){ g=Math.round(g*0.7); b.log.push(`（傭兵抽成新，報酬 ×0.7）`); }
+    S.gold+=g; h.exp+=mon.exp;
+    const drops=[];
+    for(const [m,n] of Object.entries(mon.drops)){
+      if(Math.random()<Math.min(.98,mon.drate*(ai.dropM||1))){ S.inv.mats[m]=(S.inv.mats[m]||0)+n; drops.push(MATERIALS[m].e+'×'+n); }
+    }
+    b.log.unshift(`🏆 擊殺 ${mon.name}！🪙${g}、EXP ${mon.exp}${drops.length?'，掉落 '+drops.join(' '):''}`);
+    while(h.exp>=expNeed(h.lvl)){h.exp-=expNeed(h.lvl);h.lvl++;b.log.push(`⬆️ ${d.name} 升至 Lv.${h.lvl}！`);}
+    S.exp+=Math.round(mon.exp/3);
+    while(S.exp>=expNeed(S.lv)){S.exp-=expNeed(S.lv);S.lv++;b.log.push(`🌟 主君升至 Lv.${S.lv}！`);}
+  } else {
+    const keys=['str','vit','agi','wis','luk'].filter(k=>(h.perm[k]||0)>-3);
+    const k=keys[Math.floor(Math.random()*keys.length)];
+    h.perm[k]=(h.perm[k]||0)-1;
+    b.log=[`☠️ ${d.name} 戰死。復活後「${STAT_CN[k]}」永久 -1……好好照料你的英雄。`];
+  }
+  if(isMerc){ // 傭兵用完即散
+    S.heroes=S.heroes.filter(x=>x.uid!==h.uid); S.summoned=null;
+    b.log.push('傭兵抱拳離去。（傭兵不進點將錄）');
+  }
+  S.battle=null; save(); render();
+}
+
+/* ---- 打工 ---- */
+function renderWork(){
+  return `<div class="panel"><h2>🧺 英雄打工（生產系）</h2>
+  <p class="hint">派英雄打工，<b>關閉網頁繼續採集</b>（最多記 8 小時）。收益看英雄對應屬性；打工會累積疲勞，打工中不能召喚。</p>
+  <div class="grid">${S.heroes.length===0?'<p class="hint">尚無英雄。</p>':S.heroes.map(h=>{
+    const d=heroDef(h), j=h.job&&JOBS.find(x=>x.id===h.job);
+    if(S.stallHero===h.uid) return ''; // 看攤中不能打工，顯示在擺攤頁
+    return `<div class="card r-${d.rarity}"><span class="badge r-${d.rarity}">${d.rarity}</span>
+    <span class="emoji">${d.emoji}</span><div class="name">${d.name} Lv.${h.lvl}</div>
+    ${h.job?`<div class="small" style="text-align:center;color:var(--green)">${j.emoji} ${j.name}中…（${j.hint}）</div>
+      <div style="text-align:center"><button class="act red" onclick="stopJob('${h.uid}')">召回</button></div>`
+      :`<div style="text-align:center">
+      <select id="jobsel_${h.uid}">${JOBS.map(x=>`<option value="${x.id}">${x.emoji}${x.name}（${STAT_CN[JOB_BASE[x.id]]}）</option>`).join('')}</select><br>
+      <button class="act gold" ${h.fatigue>=80?'disabled title="疲勞紅燈"':''} onclick="startJob('${h.uid}')">派去打工</button>
+      ${h.fatigue>=80?'<div class="small" style="color:var(--red)">疲勞紅燈</div>':''}</div>`}
+    </div>`;}).join('')}</div></div>`;
+}
+function startJob(uid){
+  const h=S.heroes.find(x=>x.uid===uid); if(!h||h.job)return;
+  const sel=document.getElementById('jobsel_'+uid); h.job=sel.value; h.jobStart=Date.now();
+  toast(`${heroDef(h).name} 出門${JOBS.find(j=>j.id===h.job).name}去了`); save(); render();
+}
+function stopJob(uid){
+  const h=S.heroes.find(x=>x.uid===uid); if(!h||!h.job)return;
+  const j=JOBS.find(x=>x.id===h.job), st=heroStats(h);
+  const sec=Math.min((Date.now()-h.jobStart)/1000,8*3600);
+  const eff=(st[JOB_BASE[j.id]]||8)/16*j.rate;
+  const gain=Math.floor(sec/20*eff*(1+h.lvl*.08));
+  if(gain>0) S.inv.mats[j.mat]=(S.inv.mats[j.mat]||0)+gain;
+  h.fatigue=Math.min(100,h.fatigue+sec*0.002); h.job=null;
+  toast(gain>0?`${heroDef(h).name} 帶回 ${j.matName}×${gain}`:`${heroDef(h).name} 回來了（收穫寥寥…）`);
+  save(); render();
+}
+
+/* ---- 英雄學院 ---- */
+function academyCost(h){ return Math.round(60*Math.pow(h.lvl,1.45)); }
+function renderAcademy(){
+  return `<div class="panel"><h2>🏫 英雄學院（付費訓練升級）</h2>
+  <p class="hint">花錢拜師，英雄直接獲得大量經驗。學費隨等級水漲船高；英雄等級超過主君 Lv.${S.lv} 就無法召喚——別練过头。</p>
+  <div class="grid">${S.heroes.length===0?'<p class="hint">尚無英雄。</p>':S.heroes.map(h=>{
+    const d=heroDef(h), c=academyCost(h);
+    return `<div class="card r-${d.rarity}"><span class="badge r-${d.rarity}">${d.rarity}</span>
+    <span class="emoji">${d.emoji}</span><div class="name">${d.name} Lv.${h.lvl}</div>
+    <div class="small" style="text-align:center">⚡${heroPower(h)}｜距下級 ${expNeed(h.lvl)-h.exp} EXP</div>
+    <div style="text-align:center"><button class="act gold" ${S.gold>=c?'':'disabled'} onclick="train('${h.uid}')">拜師 🪙${c}</button>
+    <button class="act" ${S.gold>=c*5?'':'disabled'} onclick="train('${h.uid}',5)">特訓×5 🪙${c*5}</button></div>
+    </div>`;}).join('')}</div></div>`;
+}
+function train(uid,n=1){
+  const h=S.heroes.find(x=>x.uid===uid); if(!h)return;
+  for(let i=0;i<n;i++){
+    const c=academyCost(h); if(S.gold<c)break;
+    S.gold-=c; h.exp+=Math.round(expNeed(h.lvl)*0.55+Math.random()*expNeed(h.lvl)*0.3);
+    while(h.exp>=expNeed(h.lvl)){h.exp-=expNeed(h.lvl);h.lvl++;}
+  }
+  toast(`${heroDef(h).name} 學成歸來，Lv.${h.lvl}！`,'var(--green)'); save(); render();
+}
+
+/* ---- 擺攤 ---- */
+function renderStall(){
+  const sh=S.stallHero&&S.heroes.find(h=>h.uid===S.stallHero);
+  return `<div class="panel"><h2>🏪 擺攤（英雄看攤，離線也開張）</h2>
+  <p class="hint">指派一位英雄看攤（看攤中不能召喚/打工），把倉庫材料上架，顧客上門自動成交。運氣越高顧客越多；價格可自己開（太高會滯銷——但原型裡顧客很佛心，照單全收）。</p>
+  ${sh?`<div class="row"><span>看攤：${heroDef(sh).emoji} ${heroDef(sh).name}（運 ${heroStats(sh).luk}）</span>
+    <button class="act red" onclick="closeStall()">收攤</button></div>
+    <h3 class="sub">架上貨物（點擊補 10 個）</h3>
+    ${S.stallStock.length?`<div class="mats">${S.stallStock.map((it,i)=>`<span onclick="stallTopUp('${it.mat}')">${MATERIALS[it.mat].e} ${MATERIALS[it.mat].n} ×${it.count}（單價🪙${it.price}）</span>`).join('')}</div>`:'<p class="hint">貨架空空，去下面補貨。</p>'}
+    <h3 class="sub">上架（從倉庫）</h3><div class="row">
+    ${Object.entries(MATERIALS).map(([k,v])=>{const have=S.inv.mats[k]||0;
+      return have>0?`<button class="act" onclick="stallList('${k}')">${v.e}${v.n}（有${have}，定價🪙${stallPrice(k)}）</button>`:'';}).join('')}
+    ${Object.entries(S.inv.cards).filter(([,c])=>c>0).map(([cid,c])=>{const d=CARD_DEFS[cid];const p=cardMarketPrice(cid);
+      return `<button class="act" onclick="stallListCard('${cid}')">${d.emoji}${d.name}（有${c}，🪙${p}）</button>`;}).join('')}
+    </div>`
+  :`<h3 class="sub">指派英雄看攤</h3><div class="row">${S.heroes.filter(h=>!h.job).map(h=>
+      `<button class="act gold" ${h.fatigue>=80?'disabled':''} onclick="openStall('${h.uid}')">${heroDef(h).emoji} ${heroDef(h).name}</button>`).join('')||'<span class="hint">無可派英雄</span>'}</div>`}
+  ${S.stallLog.length?`<h3 class="sub">攤位日誌</h3><div class="hint">${S.stallLog.slice(0,6).map(l=>`<div>${l}</div>`).join('')}</div>`:''}
+  </div>`;
+}
+function stallPrice(mat){ return Math.round(MATERIALS[mat].price*1.35); }
+function cardMarketPrice(cid){ const r=RECIPES.find(x=>x.out===cid); return r?Math.round(r.gold*1.3+20):50; }
+function openStall(uid){
+  const h=S.heroes.find(x=>x.uid===uid); if(!h||h.job||h.fatigue>=80)return;
+  S.stallHero=uid; toast(`${heroDef(h).name} 支起攤子開張了 🏪`); save(); render();
+}
+function closeStall(){
+  const h=S.heroes.find(x=>x.uid===S.stallHero);
+  if(h){ h.fatigue=Math.min(100,h.fatigue+4);
+    for(const it of S.stallStock){ if(it.cardId) S.inv.cards[it.cardId]=(S.inv.cards[it.cardId]||0)+it.count;
+      else S.inv.mats[it.mat]=(S.inv.mats[it.mat]||0)+it.count; } }
+  S.stallHero=null; S.stallStock=[]; toast('收攤，未售出商品已退回倉庫'); save(); render();
+}
+function stallList(mat){
+  const have=S.inv.mats[mat]||0; if(have<=0)return;
+  const n=Math.min(have,10); S.inv.mats[mat]-=n;
+  const ex=S.stallStock.find(x=>x.mat===mat&&!x.cardId);
+  if(ex)ex.count+=n; else S.stallStock.push({mat,count:n,price:stallPrice(mat)});
+  save(); render();
+}
+function stallListCard(cid){
+  if(!S.inv.cards[cid])return;
+  S.inv.cards[cid]--;
+  const ex=S.stallStock.find(x=>x.cardId===cid);
+  if(ex)ex.count++; else S.stallStock.push({mat:null,cardId:cid,count:1,price:cardMarketPrice(cid)});
+  save(); render();
+}
+function stallTopUp(mat){
+  if(S.inv.mats[mat]>0) stallList(mat);
+}
+// 線上顧客（每 12 秒擲骰）
+function stallCustomer(){
+  if(!S.stallHero||!S.stallStock.length)return;
+  const h=S.heroes.find(x=>x.uid===S.stallHero); if(!h)return;
+  const st=heroStats(h);
+  if(Math.random()>0.30+st.luk/100)return;
+  const it=S.stallStock[Math.floor(Math.random()*S.stallStock.length)];
+  S.gold+=it.price;
+  if(it.cardId) S.stallLog.unshift(`🛍️ 顧客買走 ${CARD_DEFS[it.cardId].emoji}${CARD_DEFS[it.cardId].name}，+🪙${it.price}`);
+  else S.stallLog.unshift(`🛍️ 顧客買走 ${MATERIALS[it.mat].e}${MATERIALS[it.mat].n}，+🪙${it.price}`);
+  it.count--; if(it.count<=0)S.stallStock=S.stallStock.filter(x=>x!==it);
+  S.stallLog=S.stallLog.slice(0,10);
+}
+
+/* ---- 英雄傭兵 ---- */
+function refreshMercs(){
+  if(S.mercDay===today()&&S.mercPool.length)return;
+  S.mercDay=today();
+  const cnt=3; S.mercPool=[];
+  const rarPool=['N','R','R','SR','SSR'];
+  for(let i=0;i<cnt;i++){
+    const rar=rarPool[Math.floor(Math.random()*rarPool.length)];
+    const pool=HERO_DEFS.filter(d=>d.rarity===rar);
+    const d=pool[Math.floor(Math.random()*pool.length)];
+    S.mercPool.push({defId:d.id, lvl:Math.max(1,S.lv+Math.floor(Math.random()*3)-1), price:0});
+  }
+  for(const mc of S.mercPool){ const tmp=makeHero(mc.defId,mc.lvl); mc.price=Math.max(30,Math.round(heroPower(tmp)*0.55)); }
+}
+function renderMerc(){
+  refreshMercs();
+  return `<div class="panel"><h2>🗡️ 英雄傭兵（今日賓館，每日更換）</h2>
+  <p class="hint">付錢僱傭兵替你打一仗。傭兵不進點將錄，打完就走，且抽成報酬 ×0.7。今日傭兵等級隨主君浮動。</p>
+  <div class="grid">${S.mercPool.map((mc,i)=>{
+    const d=HERO_DEFS.find(x=>x.id===mc.defId); const tmp=makeHero(mc.defId,mc.lvl);
+    const can=S.gold>=mc.price&&!S.battle&&!S.summoned;
+    return `<div class="card r-${d.rarity}"><span class="badge r-${d.rarity}">${d.rarity} 傭兵</span>
+    <span class="emoji">${d.emoji}</span><div class="name">${d.name} Lv.${mc.lvl}</div>
+    <div class="stats">⚡${heroPower(tmp)}｜HP ${heroHp(tmp)}｜攻 ${heroAtk(tmp)}<br>受僱費：🪙${mc.price}/仗</div>
+    <div style="text-align:center"><button class="act gold" ${can?'':'disabled'} onclick="hireMerc(${i})" title="雇傭後自動去挑戰野豬以試鋒芒；也可先在歷練選怪">僱傭</button></div>
+    </div>`;}).join('')}</div>
+  <p class="hint">流程：雇傭 → 傭兵暫駐「點將錄」→ 到「歷練」選怪出戰（無須自己召喚）。</p></div>`;
+}
+function hireMerc(i){
+  const mc=S.mercPool[i]; if(!mc||S.gold<mc.price)return;
+  S.gold-=mc.price;
+  const h=makeHero(mc.defId,mc.lvl); h.merc=true;
+  S.heroes.push(h); S.summoned=h.uid;
+  summonFx(); toast(`傭兵 ${heroDef(h).name} 抱拳聽令！至「歷練」出戰（打完即散）`); save(); setTab('battle');
+}
+
+/* ---- 市場（NPC + 行腳商人） ---- */
+function refreshMarket(){
+  if(S.marketDay===today()&&S.marketOffers.length)return;
+  const now=Date.now();
+  if(now-S.marketRefreshedAt<60000&&S.marketOffers.length&&S.marketDay===today())return;
+  S.marketDay=today(); S.marketRefreshedAt=now;
+  const cardIds=Object.keys(CARD_DEFS);
+  S.marketOffers=[];
+  const n=3;
+  for(let i=0;i<n;i++){
+    const cid=cardIds[Math.floor(Math.random()*cardIds.length)];
+    const base=cardMarketPrice(cid);
+    const p=Math.round(base*(0.6+Math.random()*0.5)); // 6 折~11 折
+    S.marketOffers.push({cid, price:p, sold:false});
+  }
+}
+function renderMarket(){
+  refreshMarket();
+  return `<div class="panel"><h2>🛒 市集（NPC 回收商）</h2>
+  <p class="hint">賣給 NPC 回收商是定價 8 折；買進是 1.5 倍。大量材料可換錢，缺料時可应急。</p>
+  <div class="grid">${Object.entries(MATERIALS).map(([k,v])=>{
+    const have=S.inv.mats[k]||0;
+    return `<div class="card"><span class="emoji" style="font-size:30px">${v.e}</span><div class="name">${v.n}</div>
+    <div class="small" style="text-align:center">持有 ${have}｜回收 🪙${Math.round(v.price*0.8)}/個｜出售 🪙${Math.round(v.price*1.5)}/個</div>
+    <div style="text-align:center"><button class="act" ${have>=1?'':'disabled'} onclick="npcSell('${k}',10)">賣10</button>
+    <button class="act" ${have>=1?'':'disabled'} onclick="npcSell('${k}',have)">全賣</button>
+    <button class="act green" ${S.gold>=Math.ceil(v.price*1.5)?'':'disabled'} onclick="npcBuy('${k}',10)">買10</button></div>
+    </div>`;}).join('')}</div></div>
+  <div class="panel"><h2>🐪 行腳商人（每日三件撿漏價）</h2>
+  <p class="hint">過路商人甩賣卡片，6~11 折隨機，每日更換（一分鐘內可花 🪙20 重刷貨架）。</p>
+  <div class="row">${S.marketOffers.map((o,i)=>{
+    const c=CARD_DEFS[o.cid];
+    return o.sold?`<span class="tag">已售出</span>`:
+    `<div class="card" style="min-width:150px"><span class="badge">${c.kind==='skill'?'技能':'裝備'}</span>
+    <span class="emoji">${c.emoji}</span><div class="name">${c.name}</div>
+    <div class="small" style="text-align:center;color:var(--dim)">${c.desc}</div>
+    <div style="text-align:center"><span class="price">🪙${o.price}</span><br>
+    <button class="act gold" ${S.gold>=o.price?'':'disabled'} onclick="buyOffer(${i})">買下</button></div></div>`;}).join('')}
+    <button class="act" ${S.gold>=20?'':'disabled'} onclick="if(S.gold>=20){S.gold-=20;S.marketRefreshedAt=0;S.marketOffers=[];refreshMarket();save();render();}">🐪 刷貨 🪙20</button>
+  </div></div>`;
+}
+function npcSell(mat,n){
+  const have=S.inv.mats[mat]||0; n=Math.min(have,n); if(n<=0)return;
+  const g=Math.round(MATERIALS[mat].price*0.8)*n;
+  S.inv.mats[mat]-=n; S.gold+=g; toast(`賣出 ${n} ${MATERIALS[mat].n}，+🪙${g}`); save(); render();
+}
+function npcBuy(mat,n){
+  const cost=Math.round(MATERIALS[mat].price*1.5)*n; if(S.gold<cost)return;
+  S.gold-=cost; S.inv.mats[mat]=(S.inv.mats[mat]||0)+n; toast(`買入 ${n} ${MATERIALS[mat].n}，-🪙${cost}`,'var(--red)'); save(); render();
+}
+function buyOffer(i){
+  const o=S.marketOffers[i]; if(!o||o.sold||S.gold<o.price)return;
+  S.gold-=o.price; o.sold=true; S.inv.cards[o.cid]=(S.inv.cards[o.cid]||0)+1;
+  toast(`撿漏成功：${CARD_DEFS[o.cid].emoji}${CARD_DEFS[o.cid].name} 🪙${o.price}`,'var(--green)'); save(); render();
+}
+
+/* ---- 鍛造 ---- */
+function renderForge(){
+  return `<div class="panel"><h2>🔨 鍛造（製造系）</h2>
+  <p class="hint">打工材料 → 裝備卡／技能卡 → 插回英雄。同名卡在一名英雄身上限 2 張。</p>
+  <div class="grid">${RECIPES.map(r=>{
+    const c=CARD_DEFS[r.out];
+    const ok=Object.entries(r.cost).every(([m,n])=>(S.inv.mats[m]||0)>=n)&&S.gold>=r.gold;
+    return `<div class="card"><span class="badge">${c.kind==='skill'?'技能卡':'裝備卡'}</span>
+    <span class="emoji">${c.emoji}</span><div class="name">${c.name}</div>
+    <div class="stats">${c.desc}<br>需：${Object.entries(r.cost).map(([m,n])=>`${MATERIALS[m].e}×${n}`).join(' ')}＋🪙${r.gold}</div>
+    <div style="text-align:center"><button class="act gold" ${ok?'':'disabled'} onclick="craft('${r.out}')">鍛造</button></div>
+    </div>`;}).join('')}</div></div>`;
+}
+function craft(outId){
+  const r=RECIPES.find(x=>x.out===outId); if(!r)return;
+  if(!Object.entries(r.cost).every(([m,n])=>(S.inv.mats[m]||0)>=n)||S.gold<r.gold)return;
+  for(const [m,n] of Object.entries(r.cost))S.inv.mats[m]-=n;
+  S.gold-=r.gold; S.inv.cards[outId]=(S.inv.cards[outId]||0)+1;
+  toast(`鍛造成功：${CARD_DEFS[outId].emoji} ${CARD_DEFS[outId].name}`,'var(--green)'); save(); render();
+}
+
+/* ---- 抽卡 ---- */
+function renderTavern(){
+  return `<div class="panel"><h2>🎴 客棧・英雄卡出售</h2>
+  <p class="hint">SSR 5%／SR 20%／R 35%／N 40%（已抽 ${S.pulls} 次）。十連保底 SR+。</p>
+  <div class="row">
+    <button class="act gold" ${S.gold>=PULL_COST?'':'disabled'} onclick="pull(1)">單抽 🪙${PULL_COST}</button>
+    <button class="act gold" ${S.gold>=PULL_COST*9?'':'disabled'} onclick="pull(9)">十連 🪙${PULL_COST*9}</button>
+  </div></div>
+  <div class="panel"><h2>🖼️ 圖鑑（${new Set(S.heroes.map(h=>h.defId)).size}/${HERO_DEFS.length}）</h2>
+  <div class="grid">${HERO_DEFS.map(d=>{
+    const owned=S.heroes.filter(h=>h.defId===d.id).length;
+    return `<div class="card r-${owned?d.rarity:'N'}" style="${owned?'':'opacity:.45'}"><span class="badge r-${d.rarity}">${d.rarity}</span>
+    <span class="emoji">${d.emoji}</span><div class="name">${d.name}</div>
+    <div class="stats">${d.lore}<br>${d.type}｜持有 ×${owned}</div></div>`;}).join('')}</div></div>`;
+}
+function pull(n){
+  const cost=PULL_COST*n; if(S.gold<cost)return; S.gold-=cost;
+  const got=[]; let hasRare=false;
+  for(let i=0;i<n;i++){
+    const avail={}; for(const k of ['SSR','SR','R','N']){ if(HERO_DEFS.some(d=>d.rarity===k))avail[k]={SSR:.05,SR:.2,R:.35,N:.4}[k]; }
+    let rar=weightedPick(avail);
+    if(i===n-1&&n===9&&!hasRare)rar=Math.random()<.5?'SR':'R';
+    if(rar==='SR'||rar==='SSR')hasRare=true;
+    const pool=HERO_DEFS.filter(d=>d.rarity===rar);
+    const d=pool[Math.floor(Math.random()*pool.length)];
+    S.heroes.push(makeHero(d.id)); got.push(d); S.pulls++;
+  }
+  save(); showPullModal(got); render();
+}
+function showPullModal(got){
+  $('#modal').innerHTML=`<div class="modalbg" onclick="if(event.target===this)closeModal()">
+    <div class="modal"><h2 style="color:var(--gold);margin-bottom:10px">🎴 開卡！</h2>
+    <div class="grid" style="grid-template-columns:repeat(3,1fr)">
+    ${got.map(d=>`<div class="card r-${d.rarity}" style="text-align:center"><span class="emoji" style="font-size:42px">${d.emoji}</span>
+      <div class="name r-${d.rarity}">${d.name}</div><div class="small r-${d.rarity}">${d.rarity} ${d.type}</div></div>`).join('')}
+    </div><div style="text-align:center;margin-top:12px"><button class="act" onclick="closeModal()">收入點將錄</button></div></div></div>`;
+}
+function closeModal(){ $('#modal').innerHTML=''; }
+
+/* ---- 背包 ---- */
+function renderBag(){
+  const cards=Object.entries(S.inv.cards).filter(([,c])=>c>0);
+  const sm=S.summoned&&S.heroes.find(h=>h.uid===S.summoned);
+  return `<div class="panel"><h2>🎒 卡片背包</h2>
+  ${sm?`<p class="hint">召喚中：<b>${heroDef(sm).emoji} ${heroDef(sm).name}</b>（${sm.slots.filter(Boolean).length}/${slotsOf(sm)} 槽）— 點卡片裝備。</p>`:`<p class="hint">先召喚英雄再裝備卡片。</p>`}
+  ${cards.length===0?'<p class="hint">背包空空。</p>':`<div class="grid">${cards.map(([cid,c])=>{
+    const d=CARD_DEFS[cid];
+    return `<div class="card"><span class="badge">${d.kind==='skill'?'技能':'裝備'} ×${c}</span>
+    <span class="emoji">${d.emoji}</span><div class="name">${d.name}</div>
+    <div class="stats">${d.desc}</div>
+    <div style="text-align:center"><button class="act" ${sm?'':'disabled'} onclick="equipToSummoned('${cid}')">裝備</button></div></div>`;}).join('')}</div>`}
+  </div>
+  <div class="panel"><h2>📦 倉庫</h2><div class="mats">${Object.entries(MATERIALS).map(([k,v])=>`<span>${v.e} ${v.n} × ${S.inv.mats[k]||0}</span>`).join('')}</div></div>
+  <div class="panel" style="text-align:right"><button class="act red" onclick="wipe()">🗑 重置存檔</button>
+  <span class="hint" style="margin-left:10px">v0.2｜存檔於 localStorage</span></div>`;
+}
+function equipToSummoned(cid){
+  if(!S.summoned)return;
+  const h=S.heroes.find(x=>x.uid===S.summoned); if(!h||!S.inv.cards[cid])return;
+  if(h.slots.filter(Boolean).length>=slotsOf(h)){toast('插槽已滿','var(--red)');return;}
+  if(h.slots.filter(x=>x===cid).length>=2){toast('同名卡最多插 2 張','var(--red)');return;}
+  const i=h.slots.indexOf(null); h.slots[i]=cid; S.inv.cards[cid]--;
+  toast(`${heroDef(h).name} 裝備 ${CARD_DEFS[cid].emoji} ${CARD_DEFS[cid].name}`,'var(--green)'); save(); render();
+}
+function wipe(){ if(confirm('確定重置所有進度？')){ localStorage.removeItem(SAVE_KEY); location.reload(); } }
+
+/* ================= 啟動 ================= */
+load(); offlineProgress(); render();
+setInterval(()=>{
+  const now=Date.now(); const dt=(now-(S.lastTick||now))/1000;
+  for(const h of S.heroes){
+    if(!h.job && S.summoned!==h.uid && S.stallHero!==h.uid) h.fatigue=Math.max(0,h.fatigue-dt*0.015);
+  }
+  stallCustomer();
+  save();
+  if(!S.battle) render();
+},3000);
+</script>
+</body>
+</html>
