@@ -34,6 +34,8 @@ nav button.on{background:var(--panel2);color:var(--gold);border-color:var(--gold
 @keyframes shine{0%{left:-60%}55%{left:130%}100%{left:130%}}
 .card.sel{outline:2px solid var(--gold)}
 .card .emoji{font-size:40px;text-align:center;display:block;filter:drop-shadow(0 3px 6px rgba(0,0,0,.6))}
+.card .emoji img,.side .big img,.slot img{width:100%;max-width:64px;height:auto;border-radius:10px;display:block;margin:0 auto;filter:drop-shadow(0 3px 6px rgba(0,0,0,.6))}
+.side .big img{max-width:78px}
 .card .name{font-weight:bold;text-align:center;font-size:15px}
 .r-N{color:var(--dim)} .r-R{color:var(--blue)} .r-SR{color:var(--purple)} .r-SSR{color:var(--gold)}
 .badge{position:absolute;top:6px;right:6px;font-size:11px;padding:1px 6px;border-radius:8px;background:#0e1420;border:1px solid var(--line);z-index:1}
@@ -215,6 +217,9 @@ function load(){
 /* ================= 工具 ================= */
 const $=s=>document.querySelector(s);
 const heroDef=h=>{ const d=HERO_DEFS.find(x=>x.id===h.defId); return d||{name:h.name||'傭兵',emoji:h.emoji||'🗡️',type:h.type||'武者',rarity:'R',ranged:!!h.ranged,lore:''}; };
+const imgOf=(id,fb)=>`<img src="art/${id}.svg" alt="${fb}" loading="lazy" onerror="this.outerText='${fb}'">`;
+const heroFace=h=>{ const id=h.defId||'luban'; const d=HERO_DEFS.find(x=>x.id===id); return imgOf(id,(d&&d.emoji)||'🗡️'); };
+const monFace=m=>imgOf(m.id,m.emoji);
 function toast(msg,color){
   const el=document.createElement('div'); el.className='toast'; el.textContent=msg;
   if(color){el.style.borderColor=color;el.style.color=color;}
@@ -321,7 +326,7 @@ function renderRoster(){
     const canSummon=!red&&!busy(h)&&h.lvl<=S.lv&&!S.battle;
     return `<div class="card r-${d.rarity} ${summoned?'sel':''}">
       <span class="badge r-${d.rarity}">${d.rarity}</span>
-      <span class="emoji">${d.emoji}</span>
+      <span class="emoji">${heroFace(h)}</span>
       <div class="name">${d.name} <span class="small">Lv.${h.lvl}</span></div>
       <div class="small" style="text-align:center;color:var(--dim)">${d.type}${d.ranged?'・遠程':''}　⚡${heroPower(h)}</div>
       <div class="stats">力${st.str} 體${st.vit} 敏${st.agi} 智${st.wis} 運${st.luk}<br>HP ${heroHp(h)}｜攻 ${heroAtk(h)}｜防 ${heroDef_(h)}</div>
@@ -367,7 +372,7 @@ function renderBattle(){
   ${MONSTERS.map(mon=>{
     const canFight=sm&&!busy(sm)&&mon.lv<=(sm.lvl+3);
     const hint=mon.lv>(sm?sm.lvl+3:3)?'（太強）':'';
-    return `<div class="card"><span class="badge">Lv.${mon.lv}</span><span class="emoji">${mon.emoji}</span>
+    return `<div class="card"><span class="badge">Lv.${mon.lv}</span><span class="emoji">${monFace(mon)}</span>
     <div class="name">${mon.name}${hint}</div>
     <div class="stats">HP ${mon.hp}｜攻 ${mon.atk}｜防 ${mon.def}<br>掉落：${Object.entries(mon.drops).map(([m,n])=>MATERIALS[m].e+'×'+n).join(' ')}<br>🪙${mon.gold}｜EXP ${mon.exp}</div>
     <div style="text-align:center"><button class="act red" ${canFight?'':'disabled'} onclick="startBattle('${mon.id}')">出戰</button></div>
@@ -378,10 +383,10 @@ function renderBattleActive(){
   const b=S.battle, h=S.heroes.find(x=>x.uid===b.heroUid), d=heroDef(h), mon=MONSTERS.find(m=>m.id===b.monId);
   return `<div class="panel"><h2>⚔️ ${d.name} vs ${mon.name}（${AI_MODES[S.aiMode].name}・積極度${S.aggression}）</h2>
   <div class="vs">
-    <div class="side" id="sideHero"><span class="big">${d.emoji}</span><div>${d.name} Lv.${h.lvl}</div>
+    <div class="side" id="sideHero"><span class="big">${heroFace(h)}</span><div>${d.name} Lv.${h.lvl}</div>
       <div class="bar"><i style="width:${Math.max(0,b.hp)/b.hpMax*100}%;background:var(--green)"></i></div><div class="hpnum">${Math.max(0,Math.round(b.hp))}/${b.hpMax}</div></div>
     <div style="font-size:22px;color:var(--gold)">⚡</div>
-    <div class="side" id="sideMon"><span class="big">${mon.emoji}</span><div>${mon.name}</div>
+    <div class="side" id="sideMon"><span class="big">${monFace(mon)}</span><div>${mon.name}</div>
       <div class="bar"><i style="width:${Math.max(0,b.monHp)/b.monMax*100}%;background:var(--red)"></i></div><div class="hpnum">${Math.max(0,Math.round(b.monHp))}/${b.monMax}</div></div>
   </div>
   <div id="battlelog">${b.log.map(l=>`<div>${l}</div>`).join('')}</div>
@@ -482,7 +487,7 @@ function renderWork(){
     const d=heroDef(h), j=h.job&&JOBS.find(x=>x.id===h.job);
     if(S.stallHero===h.uid) return ''; // 看攤中不能打工，顯示在擺攤頁
     return `<div class="card r-${d.rarity}"><span class="badge r-${d.rarity}">${d.rarity}</span>
-    <span class="emoji">${d.emoji}</span><div class="name">${d.name} Lv.${h.lvl}</div>
+    <span class="emoji">${heroFace(h)}</span><div class="name">${d.name} Lv.${h.lvl}</div>
     ${h.job?`<div class="small" style="text-align:center;color:var(--green)">${j.emoji} ${j.name}中…（${j.hint}）</div>
       <div style="text-align:center"><button class="act red" onclick="stopJob('${h.uid}')">召回</button></div>`
       :`<div style="text-align:center">
@@ -618,7 +623,7 @@ function renderMerc(){
     const d=HERO_DEFS.find(x=>x.id===mc.defId); const tmp=makeHero(mc.defId,mc.lvl);
     const can=S.gold>=mc.price&&!S.battle&&!S.summoned;
     return `<div class="card r-${d.rarity}"><span class="badge r-${d.rarity}">${d.rarity} 傭兵</span>
-    <span class="emoji">${d.emoji}</span><div class="name">${d.name} Lv.${mc.lvl}</div>
+    <span class="emoji">${heroFace(mc)}</span><div class="name">${d.name} Lv.${mc.lvl}</div>
     <div class="stats">⚡${heroPower(tmp)}｜HP ${heroHp(tmp)}｜攻 ${heroAtk(tmp)}<br>受僱費：🪙${mc.price}/仗</div>
     <div style="text-align:center"><button class="act gold" ${can?'':'disabled'} onclick="hireMerc(${i})" title="雇傭後自動去挑戰野豬以試鋒芒；也可先在歷練選怪">僱傭</button></div>
     </div>`;}).join('')}</div>
@@ -721,7 +726,7 @@ function renderTavern(){
   <div class="grid">${HERO_DEFS.map(d=>{
     const owned=S.heroes.filter(h=>h.defId===d.id).length;
     return `<div class="card r-${owned?d.rarity:'N'}" style="${owned?'':'opacity:.45'}"><span class="badge r-${d.rarity}">${d.rarity}</span>
-    <span class="emoji">${d.emoji}</span><div class="name">${d.name}</div>
+    <span class="emoji">${imgOf(d.id,d.emoji)}</span><div class="name">${d.name}</div>
     <div class="stats">${d.lore}<br>${d.type}｜持有 ×${owned}</div></div>`;}).join('')}</div></div>`;
 }
 function pull(n){
@@ -742,7 +747,7 @@ function showPullModal(got){
   $('#modal').innerHTML=`<div class="modalbg" onclick="if(event.target===this)closeModal()">
     <div class="modal"><h2 style="color:var(--gold);margin-bottom:10px">🎴 開卡！</h2>
     <div class="grid" style="grid-template-columns:repeat(3,1fr)">
-    ${got.map(d=>`<div class="card r-${d.rarity}" style="text-align:center"><span class="emoji" style="font-size:42px">${d.emoji}</span>
+    ${got.map(d=>`<div class="card r-${d.rarity}" style="text-align:center"><span class="emoji" style="font-size:42px">${imgOf(d.id,d.emoji)}</span>
       <div class="name r-${d.rarity}">${d.name}</div><div class="small r-${d.rarity}">${d.rarity} ${d.type}</div></div>`).join('')}
     </div><div style="text-align:center;margin-top:12px"><button class="act" onclick="closeModal()">收入點將錄</button></div></div></div>`;
 }
