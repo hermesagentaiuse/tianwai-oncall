@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>天外召喚錄 — 卡片英雄 RPG v0.6</title>
+<title>天外召喚錄 — 卡片英雄 RPG v0.7</title>
 <style>
 :root{
   --bg:#141a26; --panel:#1d2534; --panel2:#25304a; --line:#33405c;
@@ -85,7 +85,7 @@ h3.sub{font-size:13px;color:var(--dim);margin:10px 0 4px}
 <body>
 <div id="app">
 <header>
-  <h1>🎴 天外召喚錄 <span style="font-size:11px;color:var(--dim)">v0.6</span></h1>
+  <h1>🎴 天外召喚錄 <span style="font-size:11px;color:var(--dim)">v0.7</span></h1>
   <div class="res">
     <span>🪙 <b id="rGold">0</b></span>
     <span>主君 Lv.<b id="rLv">1</b></span>
@@ -236,12 +236,14 @@ function defaultState(){
     marketDay:0, marketOffers:[], marketRefreshedAt:0, // 行腳商人
     mercPool:[], mercDay:-1,                  // 每日傭兵池
     lastTick:Date.now(), pulls:0, stallLog:[],
-    questDay:-1, quest:{win:0,job:0,pull:0}, questClaimed:[],
+    questDay:-1, quest:{win:0,job:0,pull:0}, questClaimed:[], stallDay:-1, stallCust:0,
   };
 }
 function questTick(type){ S.quest[type]=(S.quest[type]||0)+1; }
 function questDone(){ const q=S.quest; return q.win>=5&&q.job>=1&&q.pull>=1; }
 function refreshQuest(){ if(S.questDay!==today()){ S.questDay=today(); S.quest={win:0,job:0,pull:0}; S.questClaimed=[]; } }
+const STALL_DAILY_CAP=80;
+function stallDayCheck(){ if(S.stallDay!==today()){ S.stallDay=today(); S.stallCust=0; } }
 function claimQuest(){
   refreshQuest();
   if(!questDone()){toast('任務尚未完成','var(--red)');return;}
@@ -251,7 +253,7 @@ function claimQuest(){
 }
 function save(){ S.lastTick=Date.now(); localStorage.setItem(SAVE_KEY, JSON.stringify(S,(k,v)=>k==='timer'?undefined:v)); }
 function load(){
-  try{ const d=localStorage.getItem(SAVE_KEY); if(d){ S=JSON.parse(d); S.heroes=(S.heroes||[]).filter(h=>!h.merc); if(S.summoned&&!S.heroes.some(h=>h.uid===S.summoned))S.summoned=null; S.battle=null; return; } }catch(e){}
+  try{ const d=localStorage.getItem(SAVE_KEY); if(d){ S=JSON.parse(d); S.heroes=(S.heroes||[]).filter(h=>!h.merc); S.stallDay=S.stallDay??-1; S.stallCust=S.stallCust??0; if(S.summoned&&!S.heroes.some(h=>h.uid===S.summoned))S.summoned=null; S.battle=null; return; } }catch(e){}
   S=defaultState();
   S.heroes.push(makeHero('guanyu'), makeHero('zhangfei'));
   S.inv.cards.eq_sword=1; S.inv.cards.sk_fire=1;
@@ -338,11 +340,16 @@ function offlineProgress(){
     const h=S.heroes.find(x=>x.uid===S.stallHero);
     if(h){
       const st=heroStats(h);
-      h.fatigue=Math.min(100,h.fatigue+elapsed*0.0008);
-      let customers=Math.floor(elapsed/90*(0.8+st.luk/30));
+      h.fatigue=Math.min(100,h.fatigue+elapsed*0.004);
+      S.stallDay=S.stallDay??-1; S.stallCust=S.stallCust??0;
+      if(S.stallDay!==today()){ S.stallDay=today(); S.stallCust=0; }
+      let customers=Math.min(Math.floor(elapsed/90*(0.8+st.luk/30)), Math.max(0,STALL_DAILY_CAP-S.stallCust));
       let revenue=0, sold=[];
       while(customers-->0 && S.stallStock.length){
         const it=S.stallStock[Math.floor(Math.random()*S.stallStock.length)];
+        const base=it.basePrice||it.price;
+        if(it.price>base && Math.random()<Math.min(.9,(it.price/base-1)*1.4)){ customers--; continue; } // 嫌貴走人，不占名額
+        S.stallCust++;
         revenue+=it.price; sold.push(`${MATERIALS[it.mat]?MATERIALS[it.mat].e:''}${it.price}🪙`);
         it.count--; if(it.count<=0) S.stallStock=S.stallStock.filter(x=>x!==it);
       }
@@ -646,11 +653,11 @@ function train(uid,n=1){
 function renderStall(){
   const sh=S.stallHero&&S.heroes.find(h=>h.uid===S.stallHero);
   return `<div class="panel"><h2>🏪 擺攤（英雄看攤，離線也開張）</h2>
-  <p class="hint">指派一位英雄看攤（看攤中不能召喚/打工），把倉庫材料上架，顧客上門自動成交。運氣越高顧客越多；價格可自己開（太高會滯銷——但原型裡顧客很佛心，照單全收）。</p>
+  <p class="hint">指派一位英雄看攤（看攤中不能召喚/打工），把倉庫材料上架，顧客上門自動成交。運氣越高顧客越多；價格可自己開（點貨架上「定價」）：<b>低價暢銷、高價滯銷</b>——顧客是精明的，開太高會搖搖頭走人。每位看攤英雄每日最多應付 80 位顧客。</p>
   ${sh?`<div class="row"><span>看攤：${heroDef(sh).emoji} ${heroDef(sh).name}（運 ${heroStats(sh).luk}）</span>
     <button class="act red" onclick="closeStall()">收攤</button></div>
     <h3 class="sub">架上貨物（點擊補 10 個）</h3>
-    ${S.stallStock.length?`<div class="mats">${S.stallStock.map((it,i)=>`<span onclick="stallTopUp('${it.mat}')">${MATERIALS[it.mat].e} ${MATERIALS[it.mat].n} ×${it.count}（單價🪙${it.price}）</span>`).join('')}</div>`:'<p class="hint">貨架空空，去下面補貨。</p>'}
+    ${S.stallStock.length?`<div class="mats">${S.stallStock.map((it,i)=>`<span ${it.cardId?'':`onclick="stallTopUp('${it.mat}')"`} title="點擊補貨">${it.cardId?CARD_DEFS[it.cardId].e+CARD_DEFS[it.cardId].n+'卡':MATERIALS[it.mat].e+' '+MATERIALS[it.mat].n} ×${it.count}（單價🪙${it.price}${(it.basePrice&&it.price!==it.basePrice)?` <b style="color:${it.price>it.basePrice?'var(--red)':'var(--green)'}">${it.price>it.basePrice?'↑貴':'↓俗'}</b>`:''} <button class="act" style="padding:0 6px;font-size:10px" onclick="event.stopPropagation();stallEditPrice(${i})">定價</button></span>`).join('')}</div>`:'<p class="hint">貨架空空，去下面補貨。</p>'}
     <h3 class="sub">上架（從倉庫）</h3><div class="row">
     ${Object.entries(MATERIALS).map(([k,v])=>{const have=S.inv.mats[k]||0;
       return have>0?`<button class="act" onclick="stallList('${k}')">${v.e}${v.n}（有${have}，定價🪙${stallPrice(k)}）</button>`:'';}).join('')}
@@ -688,10 +695,11 @@ function stallList(mat){
   const nHand=Math.min(n,handmade), nBought=n-nHand;
   if(nBought>0&&S.boughtMats)S.boughtMats[mat]=Math.max(0,bought-nBought);
   const pHalf=Math.round(stallPrice(mat)*0.5);
+  const base=stallPrice(mat);
   if(nHand>0){ const ex=S.stallStock.find(x=>x.mat===mat&&!x.cardId&&x.price===stallPrice(mat));
-    if(ex)ex.count+=nHand; else S.stallStock.push({mat,count:nHand,price:stallPrice(mat)}); }
+    if(ex)ex.count+=nHand; else S.stallStock.push({mat,count:nHand,price:base,basePrice:base}); }
   if(nBought>0){ const ex2=S.stallStock.find(x=>x.mat===mat&&!x.cardId&&x.price===pHalf);
-    if(ex2){ex2.count+=nBought; ex2.nBought=(ex2.nBought||0)+nBought;} else S.stallStock.push({mat,count:nBought,price:pHalf,nBought:nBought}); }
+    if(ex2){ex2.count+=nBought; ex2.nBought=(ex2.nBought||0)+nBought;} else S.stallStock.push({mat,count:nBought,price:pHalf,basePrice:stallPrice(mat),nBought:nBought}); }
   if(nBought>0) toast(`${nBought} 個「非手作」材料只賣半價 🪙${pHalf}（顧客精明了）`,'var(--dim)');
   save(); render();
 }
@@ -699,19 +707,38 @@ function stallListCard(cid){
   if(!S.inv.cards[cid])return;
   S.inv.cards[cid]--;
   const ex=S.stallStock.find(x=>x.cardId===cid);
-  if(ex)ex.count++; else S.stallStock.push({mat:null,cardId:cid,count:1,price:cardMarketPrice(cid)});
+  if(ex)ex.count++; else S.stallStock.push({mat:null,cardId:cid,count:1,price:cardMarketPrice(cid),basePrice:cardMarketPrice(cid)});
   save(); render();
 }
 function stallTopUp(mat){
   if(S.inv.mats[mat]>0) stallList(mat);
 }
+function stallEditPrice(i){
+  const it=S.stallStock[i]; if(!it)return;
+  const base=it.basePrice||it.price;
+  const raw=prompt(`開價（基準 🪙${base}，可填 ${Math.round(base*0.5)}~${base*2.5}）\n低價賣得快，高價顧客搖頭：`, it.price);
+  if(raw===null)return;
+  const p=Math.round(+raw);
+  if(!Number.isFinite(p)||p<Math.round(base*0.5)||p>base*2.5){ toast('價格超出範圍','var(--red)'); return; }
+  it.price=p; toast(`已開價 🪙${p}${p>base?'（顧客會猶豫）':p<base?'（便宜必搶）':''}`,'var(--green)'); save(); render();
+}
 // 線上顧客（每 12 秒擲骰）
 function stallCustomer(){
   if(!S.stallHero||!S.stallStock.length)return;
   const h=S.heroes.find(x=>x.uid===S.stallHero); if(!h)return;
+  stallDayCheck();
+  if(S.stallCust>=STALL_DAILY_CAP)return;
   const st=heroStats(h);
   if(Math.random()>0.30+st.luk/100)return;
   const it=S.stallStock[Math.floor(Math.random()*S.stallStock.length)];
+  // 定價決定成交率：高於市價滯銷、低於市價暢銷（顧客是精明的）
+  const base=it.basePrice||it.price;
+  if(it.price>base && Math.random()<Math.min(.9,(it.price/base-1)*1.4)){
+    S.stallLog.unshift(`🙄 顧客看了一眼「${it.cardId?CARD_DEFS[it.cardId].n:MATERIALS[it.mat].n}」直搖頭：太貴了`);
+    S.stallLog=S.stallLog.slice(0,10); return;
+  }
+  S.stallCust++;
+  h.fatigue=Math.min(100,h.fatigue+0.35);
   S.gold+=it.price;
   if(it.cardId) S.stallLog.unshift(`🛍️ 顧客買走 ${CARD_DEFS[it.cardId].emoji}${CARD_DEFS[it.cardId].name}，+🪙${it.price}`);
   else S.stallLog.unshift(`🛍️ 顧客買走 ${MATERIALS[it.mat].e}${MATERIALS[it.mat].n}，+🪙${it.price}`);
@@ -915,7 +942,7 @@ function renderSave(){
   <div class="panel"><h2>⚠️ 危險區</h2>
   <p class="hint">重置會直接清空本機進度，<b>沒有存檔碼就救不回來</b>——先導出再重置。</p>
   <div style="text-align:right"><button class="act red" onclick="wipe()">🗑 重置存檔</button></div>
-  <span class="hint">v0.6｜存檔於 localStorage｜換裝置/清瀏覽器前務必先導出存檔碼</span></div>`;
+  <span class="hint">v0.7｜存檔於 localStorage｜換裝置/清瀏覽器前務必先導出存檔碼</span></div>`;
 }
 function equipToSummoned(cid){
   if(!S.summoned)return;
@@ -980,6 +1007,7 @@ setInterval(()=>{
     if(!h.job && S.summoned!==h.uid && S.stallHero!==h.uid) h.fatigue=Math.max(0,h.fatigue-dt*0.015);
   }
   stallCustomer();
+  stallDayCheck();
   save();
   // 只在狀態實質變化時重繪（疲勞以 5% 為粒度），避免每 3 秒無腦刷新導致畫面跳動
   if(!S.battle && stateSig()!==lastSig){ lastSig=stateSig(); render(); }
